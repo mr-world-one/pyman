@@ -20,5 +20,13 @@ npm run build
 npm run lint
 ```
 
+
 ### Customize configuration
 See [Configuration Reference](https://cli.vuejs.org/config/).
+
+
+
+### All back-end requirements is in \back-end folder
+```
+pip install requirements.txt
+```
