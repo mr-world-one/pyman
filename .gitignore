@@ -1,3 +1,4 @@
+# macOS
 .DS_Store
 node_modules
 /dist
@@ -13,6 +14,32 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+.ipynb_checkpoints
+.mypy_cache
+__pycache__
+.pytest_cache
+htmlcov
+dist
+site
+.coverage*
+coverage.xml
+.netlify
+test.db
+log.txt
+Pipfile.lock
+env3.*
+env
+docs_build
+site_build
+venv
+docs.zip
+archive.zip
+
+# vim temporary files
+*~
+.*.sw?
+.cache
+
 # Editor directories and files
 .idea
 .vscode
@@ -21,9 +48,6 @@ pnpm-debug.log*
 *.njsproj
 *.sln
 *.sw?
-
-
-
 
 # venv and cache
 back-end/.idea/
