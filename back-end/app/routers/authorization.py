@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession  # Імпортуємо AsyncSession
+from sqlalchemy.future import select  # Для асинхронних запитів
 from app.schemas.schema import UserCreate, Token
 from app.models.model import User
 from app.database import get_db
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
+from typing import Optional  # Імпортуємо для використання Optional
 
 # Конфігурація JWT
 SECRET_KEY = "your_secret_key"
@@ -26,34 +28,41 @@ def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
 # Генерація JWT-токена
-def create_access_token(data: dict, expires_delta: timedelta | None = None):
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=15))
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 # Реєстрація нового користувача
 @router.post("/register", response_model=Token)
-def register_user(user: UserCreate, db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.email == user.email).first()
+async def register_user(user: UserCreate, db: AsyncSession = Depends(get_db)):  # Використовуємо AsyncSession
+    # Виконуємо асинхронний запит для перевірки, чи існує користувач
+    result = await db.execute(select(User).filter(User.email == user.email))
+    db_user = result.scalar_one_or_none()
+    
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
     hashed_password = get_password_hash(user.password)
-    new_user = User(username=user.username, email=user.email, hashed_password=hashed_password)
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    new_user = User(name=user.name, email=user.email, hashed_password=hashed_password)  # Виправлено тут
     
-    access_token = create_access_token(data={"sub": new_user.username})
+    db.add(new_user)
+    await db.commit()  # Використовуємо асинхронний commit
+    await db.refresh(new_user)  # Оновлюємо користувача після коміту
+    
+    access_token = create_access_token(data={"sub": new_user.name})
     return {"access_token": access_token, "token_type": "bearer"}
+
 
 # Авторизація користувача
 @router.post("/login", response_model=Token)
-def login(user: UserCreate, db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.email == user.email).first()
+async def login(user: UserCreate, db: AsyncSession = Depends(get_db)):  # Використовуємо AsyncSession
+    result = await db.execute(select(User).filter(User.email == user.email))
+    db_user = result.scalar_one_or_none()
+
     if not db_user or not verify_password(user.password, db_user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
-    access_token = create_access_token(data={"sub": db_user.username})
+    access_token = create_access_token(data={"sub": db_user.name})
     return {"access_token": access_token, "token_type": "bearer"}
