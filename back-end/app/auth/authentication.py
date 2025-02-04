@@ -1,14 +1,16 @@
-from fastapi import HTTPException, Depends, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from jose import JWTError, jwt
-from passlib.context import CryptContext
-from datetime import datetime, timedelta
-from app.schemas.schema import Token
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.database import get_db
-from app.models.model import User
-from sqlalchemy.future import select
+# Third-party imports  
+from datetime import datetime, timedelta  
+from fastapi import Depends, HTTPException, status  
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm  
+from jose import JWTError, jwt  
+from passlib.context import CryptContext  
+from sqlalchemy.ext.asyncio import AsyncSession  
+from sqlalchemy.future import select  
 
+# Local imports  
+from app.database import get_db  
+from app.models.model import User  
+from app.schemas.schema import Token
 
 
 SECRET_KEY = "83daa0256a2289b0fb23693bf1f6034d44396675749244721a2b20e896e11662"
@@ -72,12 +74,3 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Dep
         raise credential_exception
 
     return user
-
-
-
-
-
-
-
-
-
