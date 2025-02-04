@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from .routers import temporary_router
+from .routers import temporary_router, authorization as auth_router
 from app.database import engine, Base
 
 app = FastAPI()
@@ -14,6 +14,7 @@ async def startup():
     await init_db()
 
 app.include_router(temporary_router.router)
+app.include_router(auth_router.router)  # Додаємо авторизацію
 
 
 @app.get("/")
