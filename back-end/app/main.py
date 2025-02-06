@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from .routers import temporary_router
 from app.database import engine, Base
+from logger import logger
 
 app = FastAPI()
 
@@ -18,4 +19,5 @@ app.include_router(temporary_router.router)
 
 @app.get("/")
 def home() -> dict:
+    logger.info("Home page")
     return {"msg" : "HomePage"}
