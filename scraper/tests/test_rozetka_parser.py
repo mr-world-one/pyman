@@ -41,7 +41,7 @@ class TestRozetkaParser(unittest.TestCase):
 
         info = self.parser.info(url)
 
-        self.assertIsNotNone(info['title'])
+        self.assertEqual(info['title'], 'Стів Джобс: людина, яка мислила по-іншому (М)')
 
     def tearDown(self):
         self.parser.close()
