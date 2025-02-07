@@ -23,6 +23,7 @@
                 <li><router-link to="/" @click.native="toggleMenu">Головна</router-link></li>
                 <li><router-link to="/about" @click.native="toggleMenu">Про нас</router-link></li>
                 <li><router-link to="/register" @click.native="toggleMenu">Реєстрація</router-link></li>
+                <li><router-link to="/xpath" @click.native="toggleMenu">X-Path</router-link></li>
               </ul>
             </div>
           </div>
@@ -60,8 +61,6 @@
   @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@700&family=Anton&display=swap');
 
   body, html {
-    margin: 0;
-    padding: 0;
     box-sizing: border-box;
     overflow-x: hidden;
     height: 100%;
@@ -69,6 +68,8 @@
   }
 
   #app {
+    max-width: 1280px;
+    margin: auto;
     display: flex;
     flex-direction: column;
     min-height: 100vh;
@@ -81,9 +82,10 @@
   }
 
   header {
-    position: relative;
+    position: fixed;
     background: #ffffff;
     width: 100%;
+    right: 1%;
     box-sizing: border-box;
     display: flex;
   }
@@ -185,17 +187,22 @@
   }
 
   footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
     background: #ffffff;
     color: #000000;
     padding: 15px;
     text-align: center;
     border-radius: 20px 20px 0 0;
-    width: 100%;
     box-sizing: border-box;
     font-family: 'Raleway', sans-serif;
     font-weight: 700;
     letter-spacing: 1px;
+    z-index: 1000; /* Забезпечує, що футер завжди поверх іншого контенту */
   }
+
 
   .side-menu-overlay {
     position: fixed;

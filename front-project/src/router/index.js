@@ -19,6 +19,11 @@ const router = createRouter({
       name: 'register',
       component: () => import('../views/RegisterView.vue'),
     },
+    {
+      path: '/xpath',
+      name: 'Xpath',
+      component: () => import('@/views/XPathView.vue') // або інший шлях до компонента
+    }
   ],
 })
 

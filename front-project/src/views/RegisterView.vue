@@ -1,65 +1,76 @@
 <template>
-  <div class="register">
-    <h1>Реєстрація користувача</h1>
-    <form @submit.prevent="handleRegister" class="registration-form">
-      <div class="form-group">
-        <label for="email">
-          Email <span class="required">*</span>
-        </label>
-        <input
-          type="email"
-          id="email"
-          v-model="email"
-          placeholder="Введіть email"
-          required
-        />
-      </div>
-      <div class="form-group">
-        <label for="password">
-          Password <span class="required">*</span>
-        </label>
-        <input
-          type="password"
-          id="password"
-          v-model="password"
-          placeholder="Введіть пароль"
-          required
-        />
-      </div>
-      <button type="submit">Зареєструватися!</button>
-    </form>
+  <div class="register-page">
+    <div class="register">
+      <h1>Реєстрація користувача</h1>
+      <form @submit.prevent="handleRegister" class="registration-form">
+        <div class="form-group">
+          <label for="email">
+            Email <span class="required">*</span>
+          </label>
+          <input
+            type="email"
+            id="email"
+            v-model="email"
+            placeholder="Введіть email"
+            required
+          />
+        </div>
+        <div class="form-group">
+          <label for="password">
+            Password <span class="required">*</span>
+          </label>
+          <input
+            type="password"
+            id="password"
+            v-model="password"
+            placeholder="Введіть пароль"
+            required
+          />
+        </div>
+        <button type="submit">Зареєструватися!</button>
+      </form>
+    </div>
   </div>
 </template>
 
 <script>
-import { ref } from 'vue'
+import { ref } from 'vue';
 
 export default {
   name: 'RegistrationView',
   setup() {
-    const username = ref('')
-    const email = ref('')
-    const password = ref('')
+    const username = ref('');
+    const email = ref('');
+    const password = ref('');
 
     const handleRegister = () => {
       // Тут можна додати логіку реєстрації (наприклад, звернення до API)
-      alert(`Користувач ${username.value} зареєстрований!`)
-      // Очистка полів форми (розкоментуйте ці рядки, якщо потрібне очищення)
-      // username.value = ''
-      // email.value = ''
-      // password.value = ''
-    }
+      alert(`Користувач ${username.value} зареєстрований!`);
+      // За потреби – очистіть поля форми:
+      // username.value = '';
+      // email.value = '';
+      // password.value = '';
+    };
 
-    return { username, email, password, handleRegister }
+    return { username, email, password, handleRegister };
   },
-}
+};
 </script>
 
-
 <style scoped>
+
+.register-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 100px;
+    min-height: 100vh;
+}
+
 .register {
   max-width: 500px;
-  margin: 50px auto;
+  width: 100%;
+  margin: 0 auto;
   padding: 30px;
   background-color: #ffffff;
   border-radius: 8px;
@@ -111,14 +122,14 @@ input:focus {
 }
 
 button {
-  padding: 12px 15px;
+  background: linear-gradient(135deg, #41ec22, #27ac0f);
+  color: white;
+  padding: 0.8rem;
   font-size: 1.1rem;
-  background-color: #007bff;
-  color: #fff;
   border: none;
-  border-radius: 4px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  transition: background 0.3s;
 }
 
 button:hover {
