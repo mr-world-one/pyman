@@ -22,7 +22,7 @@ class RozetkaParser(BaseParser):
     def parse_price(price):
         # rozetka provides price in the following format: ***$
         match = re.search(r'\d+', price)
-        return int(match.group()) if match else None
+        return float(match.group()) if match else None
 
     def info(self, url):
         '''returns information about specific product 
