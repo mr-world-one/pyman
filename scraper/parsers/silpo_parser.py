@@ -16,6 +16,14 @@ SILPO_TITLE_XPATH = '/html/body/sf-shop-silpo-root/shop-silpo-root-shell/silpo-s
 class SilpoParser(BaseParser):
     def init(self):
         super().__init__()
+
+    @staticmethod
+    def parse_price(price):
+        # silpo provides price in the following format: *** грн
+        match = re.search(r"\d+\.\d+|\d+", price)
+        if match:
+            price = float(match.group())
+            return price
     
     def info(self, url):
         '''method returns a dictionary is the following format:
@@ -41,15 +49,15 @@ class SilpoParser(BaseParser):
         # if on sale
         try:
             d = self._parse_price_and_sale_price(SILPO_PRICE_ON_SALE_XPATH, SILPO_PRICE_WITHOUT_SALE_XPATH)
-            data['price_on_sale'] = d['price_on_sale_element'].text
-            data['price'] = d['price_element'].text
+            data['price_on_sale'] = self.parse_price(d['price_on_sale_element'].text)
+            data['price'] = self.parse_price(d['price_element'].text)
         except Exception as e:
             # product is not on sale
             try:
                 price_element = self._parse_price(SILPO_PRICE_XPATH)
-                data['price'] = price_element.text
+                data['price'] = self.parse_price(price_element.text)
             except Exception as e:
-                print('Unable to parse price')
+                print(f'Unable to parse price {e}')
         
         # if is available
         try:
