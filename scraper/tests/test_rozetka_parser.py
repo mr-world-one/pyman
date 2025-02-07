@@ -12,7 +12,7 @@ class TestRozetkaParser(unittest.TestCase):
         info = self.parser.info(url)
 
         self.assertEqual(info['price'], 360)
-        self.assertEqual(info['sale_price'], 319)
+        self.assertEqual(info['price_on_sale'], 319)
     
     def test_info_product_not_on_sale(self):
         url = 'https://rozetka.com.ua/412737279/p412737279/'
@@ -20,7 +20,7 @@ class TestRozetkaParser(unittest.TestCase):
         info = self.parser.info(url)
 
         self.assertEqual(info['price'], 277)
-        self.assertIsNone(info['sale_price'])
+        self.assertIsNone(info['price_on_sale'])
 
     def test_info_product_is_not_available(self):
         url = 'https://rozetka.com.ua/452784485/p452784485/'
