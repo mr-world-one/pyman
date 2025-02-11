@@ -30,3 +30,11 @@ See [Configuration Reference](https://cli.vuejs.org/config/).
 ```
 pip install requirements.txt
 ```
+
+
+### Environment variables
+For using environment variables, first of all, you have to install dotenv module
+```
+pip install python-dotenv
+```
+Then create .env file and initialize all vulnerable data in variables there.

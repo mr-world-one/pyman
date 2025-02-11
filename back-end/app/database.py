@@ -1,8 +1,13 @@
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
+from dotenv import load_dotenv
+import os
 
-DATABASE_URL = "postgresql+asyncpg://postgres:573572S@localhost:5432/Softserve_project_db"
+#loading all data from .env file
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 #  асинхронний двигун бази даних
 engine = create_async_engine(DATABASE_URL, echo=True)
