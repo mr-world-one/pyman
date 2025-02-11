@@ -1,75 +1,23 @@
 from scraper.parsers.base_parser import BaseParser
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
-
+from scraper.parsers.xpaths import SilpoXPaths
 import re
 
-SILPO_URL = 'https://silpo.ua/'
-SILPO_PRICE_ON_SALE_XPATH = '/html/body/sf-shop-silpo-root/shop-silpo-root-shell/silpo-shell-main/div/div[3]/silpo-product-product-page/div/div/div/div[2]/div/div[1]/div[1]'
-SILPO_PRICE_WITHOUT_SALE_XPATH = '/html/body/sf-shop-silpo-root/shop-silpo-root-shell/silpo-shell-main/div/div[3]/silpo-product-product-page/div/div/div/div[2]/div/div[1]/div[2]/div[1]'
-SILPO_PRICE_XPATH = '/html/body/sf-shop-silpo-root/shop-silpo-root-shell/silpo-shell-main/div/div[3]/silpo-product-product-page/div/div/div/div[2]/div/div[1]/div[1]'
-SILPO_INFO_ABOUT_AVAILABILITY_XPATH = '/html/body/sf-shop-silpo-root/shop-silpo-root-shell/silpo-shell-main/div/div[3]/silpo-product-product-page/div/div/div/div[2]/div/div[2]/shop-silpo-common-page-add-to-basket/div/div/button'
-SILPO_IS_NOT_AVAILABLE_MESSAGE = 'Товар закінчився'
-SILPO_IS_AVAILABLE_MESSAGE = 'У кошик'
-SILPO_TITLE_XPATH = '/html/body/sf-shop-silpo-root/shop-silpo-root-shell/silpo-shell-main/div/div[3]/silpo-product-product-page/div/div/div/div[2]/h1'
-
 class SilpoParser(BaseParser):
+
+    xpaths = SilpoXPaths()
+
     def init(self):
         super().__init__()
 
-    @staticmethod
-    def parse_price(price):
+    def normalize_price(self, price):
         # silpo provides price in the following format: *** грн
         match = re.search(r"\d+\.\d+|\d+", price)
         if match:
             price = float(match.group())
             return price
-    
-    def info(self, url):
-        '''method returns a dictionary is the following format:
-        data = {
-            'url': url,
-            'price': None,
-            'price_on_sale': None,
-            'is_available': False,
-            'title': None,
-        }
-        '''
-
-        self.driver.get(url)
-
-        data = {
-            'url': url,
-            'price': None,
-            'price_on_sale': None,
-            'is_available': False,
-            'title': None,
-        }
-
-        # if on sale
-        try:
-            d = self._parse_price_and_sale_price(SILPO_PRICE_ON_SALE_XPATH, SILPO_PRICE_WITHOUT_SALE_XPATH)
-            data['price_on_sale'] = self.parse_price(d['price_on_sale_element'].text)
-            data['price'] = self.parse_price(d['price_element'].text)
-        except Exception as e:
-            # product is not on sale
-            try:
-                price_element = self._parse_price(SILPO_PRICE_XPATH)
-                data['price'] = self.parse_price(price_element.text)
-            except Exception as e:
-                print(f'Unable to parse price {e}')
         
-        # if is available
-        try:
-            data['is_available'] = self._parse_availability(SILPO_INFO_ABOUT_AVAILABILITY_XPATH,
-                                                            lambda info: SILPO_IS_AVAILABLE_MESSAGE in info.text)
-        except:
-            pass
-
-        # title
-        try:
-            title_element = self._parse_title(SILPO_TITLE_XPATH)
-            data['title'] = title_element.text
-        except:
-            pass
+    def info(self, url):
+        data = super().info(url, self.xpaths)
+        if data['price_on_sale'] == data['price']:
+            data['price_on_sale'] = None
         return data
