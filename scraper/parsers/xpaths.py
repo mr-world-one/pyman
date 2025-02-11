@@ -30,3 +30,20 @@ class SilpoXPaths(BaseXPaths):
     AVAILABLE_TEXT = 'У кошик'
     URL = 'https://silpo.ua/'
     
+class EpicentrXPaths(BaseXPaths):
+    PRICE_ON_SALE = '//*[@id="main"]/div[2]/div[4]/div/div[1]/div[2]/data/data[1]'
+    PRICE_WITHOUT_SALE = '//*[@id="main"]/div[2]/div[4]/div/div[1]/div[1]/s/data'
+    PRICE = '//*[@id="main"]/div[2]/div[4]/div/div[1]/div/data/data[1]'
+    AVAILABILITY = '//*[@id="main"]/div[2]/div[1]/div/div/div[1]/span'
+    TITLE = '//*[@id="__template"]/main/div[1]/div/div/div/header/div/div[1]/h1'
+    AVAILABLE_TEXT = 'Готовий до відправки'
+    URL = 'https://epicentrk.ua/'
+
+class CitadelXPaths(BaseXPaths):
+    PRICE_ON_SALE = '//*[@id="content"]/div/div[1]/div[2]/div[2]/div/div[1]'
+    PRICE_WITHOUT_SALE = '//*[@id="content"]/div/div[1]/div[2]/div[2]/div/div[2]'
+    PRICE = '//*[@id="content"]/div/div[1]/div[2]/div[2]/div/div'
+    AVAILABILITY = '//*[@id="content"]/div/div[1]/div[2]/div[2]/ul/li[3]/span'
+    TITLE = '//*[@id="product-product"]/main/div[1]/div/h1'
+    AVAILABLE_TEXT = 'В наявності'
+    URL = 'https://citadelbuddekor.com.ua/'
