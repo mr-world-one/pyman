@@ -1,15 +1,18 @@
+#Third-party imports
+from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from typing import List
+
+#Local imports
 from app.database import get_db
 from app.models.model import User
 from app.schemas.schema import UserCreate, UserResponse
-from typing import List
 from app.auth.authentication import create_access_token, authenticate_user
-from fastapi.security import OAuth2PasswordRequestForm
 from app.schemas.schema import Token
 from app.auth.authentication import ACCESS_TOKEN_EXPIRE_MINUTES
-from datetime import timedelta
 
 router = APIRouter()
 

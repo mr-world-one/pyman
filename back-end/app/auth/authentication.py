@@ -5,16 +5,20 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt  
 from passlib.context import CryptContext  
 from sqlalchemy.ext.asyncio import AsyncSession  
-from sqlalchemy.future import select  
+from sqlalchemy.future import select
+from dotenv import load_dotenv
+import os
 
 # Local imports  
 from app.database import get_db  
 from app.models.model import User  
 from app.schemas.schema import Token
 
+#loading all data from .env file
+load_dotenv()
 
-SECRET_KEY = "83daa0256a2289b0fb23693bf1f6034d44396675749244721a2b20e896e11662"
-ALGORITHM = "HS256"
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 pwd_context = CryptContext(schemes = ["bcrypt"], deprecated = "auto")
