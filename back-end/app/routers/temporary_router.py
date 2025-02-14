@@ -1,7 +1,6 @@
 #Third-party imports
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from typing import List
@@ -10,9 +9,6 @@ from typing import List
 from app.database import get_db
 from app.models.model import User
 from app.schemas.schema import UserCreate, UserResponse
-from app.auth.authentication import create_access_token, authenticate_user
-from app.schemas.schema import Token
-from app.auth.authentication import ACCESS_TOKEN_EXPIRE_MINUTES
 
 router = APIRouter()
 
@@ -51,15 +47,3 @@ async def delete_user(user_id: int, db: AsyncSession = Depends(get_db)):
     await db.delete(user)
     await db.commit()
     return {"msg": "User deleted successfully"}
-
-
-@router.post("/token", response_model=Token)
-def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate_user(form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(status_code = status.HTTP_401_UNAUTHORIZED, detail= "Incorrect username or password", headers={"WWW-Authenticate": "Bearer"})
-
-    access_token_expires = timedelta(minutes = ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(data = {"sub": user.name}, expires_delta= access_token_expires)
-    return {"access_token": access_token, "token_type": "bearer"}
-
