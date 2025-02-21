@@ -1,10 +1,14 @@
 # macOS
 .DS_Store
-node_modules
+
+# Node modules
+node_modules/
+
+# Build directories
 /dist
+/build
 
-
-# local env files
+# Local environment files
 .env.local
 .env.*.local
 
@@ -14,45 +18,60 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-.ipynb_checkpoints
-.mypy_cache
-__pycache__
-.pytest_cache
-htmlcov
-dist
-site
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Python cache
+.mypy_cache/
+__pycache__/
+.pytest_cache/
+htmlcov/
+dist/
+site/
 .coverage*
 coverage.xml
-.netlify
+
+# Netlify directories
+.netlify/
+
+# Database and log files
 test.db
 log.txt
+
+# Pipfile lock
 Pipfile.lock
+
+# Virtual environment files
 env3.*
-env
-docs_build
-site_build
-venv
+env/
+venv/
+
+# Documentation builds
+docs_build/
+site_build/
 docs.zip
 archive.zip
 
-# vim temporary files
+# Vim temporary files
 *~
 .*.sw?
-.cache
+.cache/
 
-# Editor directories and files
-.idea
-.vscode
+# Python bytecode
+*.pyc
+
+# IDE directories and files
+.idea/
+.vscode/
+.vs/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
-*.sw?
+*.swp
 
-# venv and cache
+# Backend-specific IDE files
 back-end/.idea/
 back-end/.venv/
 back-end/app/__pycache__/
 back-end/app/routers/__pycache__/
-
-
