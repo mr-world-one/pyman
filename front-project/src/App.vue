@@ -24,6 +24,9 @@
                 <li><router-link to="/about" @click.native="toggleMenu">Про нас</router-link></li>
                 <li><router-link to="/register" @click.native="toggleMenu">Реєстрація</router-link></li>
                 <li><router-link to="/xpath" @click.native="toggleMenu">X-Path</router-link></li>
+                <li><router-link to="/signin" @click.native="toggleMenu">Увійти</router-link></li>
+                <li><router-link to="/excel-page" @click.native="toggleMenu">Excel tenders</router-link></li>
+                <li><router-link to="/search-tender" @click.native="toggleMenu">Prozorro tenders</router-link></li>
               </ul>
             </div>
           </div>
@@ -64,7 +67,8 @@
     box-sizing: border-box;
     overflow-x: hidden;
     height: 100%;
-    background: #ffffff;
+    background: url('@/assets/istockphoto-1368169112-612x612.jpg') no-repeat center;
+    background-size: cover;
   }
 
   #app {
@@ -85,7 +89,7 @@
     position: fixed;
     background: #ffffff;
     width: 100%;
-    right: 1%;
+    right: 1px;
     box-sizing: border-box;
     display: flex;
   }
@@ -109,6 +113,7 @@
 
   .green {
     color: #35f816;
+    text-transform: lowercase;
   }
 
   .red {
@@ -122,6 +127,7 @@
     font-weight: 300;
     opacity: 0.9;
     margin-top: 5px;
+    color: black;
   }
 
   .menu-container {
@@ -200,7 +206,7 @@
     font-family: 'Raleway', sans-serif;
     font-weight: 700;
     letter-spacing: 1px;
-    z-index: 1000; /* Забезпечує, що футер завжди поверх іншого контенту */
+    z-index: 1000; 
   }
 
 
@@ -210,7 +216,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.3);
     z-index: 1100;
     display: flex;
     justify-content: flex-end;
@@ -219,7 +225,7 @@
   .side-menu {
     width: 250px;
     height: 100%;
-    background: #000000;
+    background: #aa1108;
     padding: 20px;
     box-sizing: border-box;
     z-index: 1200;
@@ -240,7 +246,7 @@
       }
 
     .side-menu a {
-      color: #ffffff !important;
+      color: #ffffff;
       text-decoration: none;
       font-size: 1.1rem;
     }
