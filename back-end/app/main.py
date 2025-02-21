@@ -1,5 +1,8 @@
+#Third-party imports
 from fastapi import FastAPI
-from .routers import temporary_router
+
+#Local imports
+from app.routers import temporary_router, authentication, xpath
 from app.database import engine, Base
 
 app = FastAPI()
@@ -14,7 +17,8 @@ async def startup():
     await init_db()
 
 app.include_router(temporary_router.router)
-
+app.include_router(authentication.router)
+app.include_router(xpath.router)
 
 @app.get("/")
 def home() -> dict:

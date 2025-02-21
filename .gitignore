@@ -54,5 +54,8 @@ back-end/.idea/
 back-end/.venv/
 back-end/app/__pycache__/
 back-end/app/routers/__pycache__/
+back-end/app/models/__pycache__/
+back-end/app/schemas/__pycache__/
 
-
+#.env
+back-end/app/.env
