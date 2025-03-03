@@ -1,3 +1,44 @@
+<script>
+import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { apiClient } from '@/api/config';
+
+export default {
+  name: "App",
+  setup() {
+    const router = useRouter();
+    const menuOpen = ref(false);
+    const isAuthenticated = ref(false);
+
+    const toggleMenu = () => {
+      menuOpen.value = !menuOpen.value;
+    };
+
+    const checkAuth = () => {
+      const token = localStorage.getItem('token');
+      isAuthenticated.value = !!token;
+    };
+
+    const handleLogout = async () => {
+      localStorage.removeItem('token');
+      isAuthenticated.value = false;
+      await router.push('/signin');
+    };
+
+    onMounted(() => {
+      checkAuth();
+    });
+
+    return { 
+      menuOpen, 
+      toggleMenu, 
+      isAuthenticated,
+      handleLogout 
+    };
+  }
+};
+</script>
+
 <template>
   <div id="app">
     <header>
@@ -20,13 +61,14 @@
           <div v-if="menuOpen" class="side-menu-overlay" @click="toggleMenu">
             <div class="side-menu" @click.stop>
               <ul>
-                <li><router-link to="/" @click.native="toggleMenu">Головна</router-link></li>
-                <li><router-link to="/about" @click.native="toggleMenu">Про нас</router-link></li>
-                <li><router-link to="/register" @click.native="toggleMenu">Реєстрація</router-link></li>
-                <li><router-link to="/xpath" @click.native="toggleMenu">X-Path</router-link></li>
-                <li><router-link to="/signin" @click.native="toggleMenu">Увійти</router-link></li>
-                <li><router-link to="/excel-page" @click.native="toggleMenu">Excel tenders</router-link></li>
-                <li><router-link to="/search-tender" @click.native="toggleMenu">Prozorro tenders</router-link></li>
+                <li><router-link to="/" @click="toggleMenu">Головна</router-link></li>
+                <li><router-link to="/about" @click="toggleMenu">Про нас</router-link></li>
+                <li v-if="!isAuthenticated"><router-link to="/register" @click="toggleMenu">Реєстрація</router-link></li>
+                <li v-if="!isAuthenticated"><router-link to="/signin" @click="toggleMenu">Увійти</router-link></li>
+                <li v-if="isAuthenticated"><router-link to="/xpath" @click="toggleMenu">X-Path</router-link></li>
+                <li v-if="isAuthenticated"><router-link to="/excel-page" @click="toggleMenu">Excel tenders</router-link></li>
+                <li v-if="isAuthenticated"><router-link to="/search-tender" @click="toggleMenu">Prozorro tenders</router-link></li>
+                <li v-if="isAuthenticated"><a href="#" @click.prevent="handleLogout">Вийти</a></li>
               </ul>
             </div>
           </div>
@@ -44,20 +86,7 @@
   </div>
 </template>
 
-<script>
-  import { ref } from 'vue';
 
-  export default {
-    name: "App",
-    setup() {
-      const menuOpen = ref(false);
-      const toggleMenu = () => {
-        menuOpen.value = !menuOpen.value;
-      };
-      return { menuOpen, toggleMenu };
-    }
-  };
-</script>
 
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500&family=Raleway:wght@300;700&display=swap');
@@ -262,4 +291,21 @@
   .slide-enter-to, .slide-leave-from {
     transform: translateX(0);
   }
+  .auth-buttons {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.auth-link {
+  color: #000000;
+  text-decoration: none;
+  padding: 5px 10px;
+  border-radius: 5px;
+  transition: background-color 0.3s;
+}
+
+.auth-link:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
 </style>

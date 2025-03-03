@@ -44,7 +44,20 @@ const router = createRouter({
       name: 'Prozorro',
       component: () => import('@/views/ProzorroView.vue')
     }
-  ],
+  ], 
+    
 })
 
+
+// Navigation guard
+router.beforeEach((to, from, next) => {
+  const token = localStorage.getItem('token')
+  const publicPages = ['/signin', '/register', '/', '/about']
+  const authRequired = !publicPages.includes(to.path)
+
+  if (authRequired && !token) {
+    return next('/signin')
+  }
+  next()
+})
 export default router

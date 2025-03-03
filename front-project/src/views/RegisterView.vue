@@ -1,3 +1,6 @@
+import { ref } from 'vue'
+import { authService } from '@/api/authService'
+import { useRouter } from 'vue-router'
 <template>
   <div class="register-page">
     <div class="register">
@@ -34,27 +37,36 @@
 </template>
 
 <script>
-import { ref } from 'vue';
+import { ref } from 'vue'
+import { authService } from '@/api/authService'
+import { useRouter } from 'vue-router'
 
 export default {
   name: 'RegistrationView',
   setup() {
-    const username = ref('');
-    const email = ref('');
-    const password = ref('');
+    const router = useRouter()
+    const email = ref('')
+    const password = ref('')
+    const error = ref(null)
 
-    const handleRegister = () => {
-      // Тут можна додати логіку реєстрації (наприклад, звернення до API)
-      alert(`Користувач ${username.value} зареєстрований!`);
-      // За потреби – очистіть поля форми:
-      // username.value = '';
-      // email.value = '';
-      // password.value = '';
-    };
+    const handleRegister = async () => {
+      try {
+        const response = await authService.register({
+          email: email.value,
+          password: password.value
+        })
+        // After successful registration, login the user
+        const loginResponse = await authService.login(email.value, password.value)
+        localStorage.setItem('token', loginResponse.access_token)
+        router.push('/')
+      } catch (err) {
+        error.value = err.response?.data?.detail || 'Registration failed'
+      }
+    }
 
-    return { username, email, password, handleRegister };
-  },
-};
+    return { email, password, error, handleRegister }
+  }
+}
 </script>
 
 <style scoped>
