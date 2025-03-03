@@ -5,7 +5,10 @@ import os
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import create_async_engine
 import logging
-from .routers import temporary_router, xpath, authorization as auth_router
+from fastapi.middleware.cors import CORSMiddleware
+
+#Local imports
+from app.routers import temporary_router, xpath, authorization as auth_router
 from app.database import Base
 from app.db_test import verify_database_connection
 
@@ -15,6 +18,15 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # Vite default port
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Database initialization
 async def init_db():
