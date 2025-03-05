@@ -1,11 +1,23 @@
-import { ref } from 'vue'
-import { authService } from '@/api/authService'
-import { useRouter } from 'vue-router'
 <template>
   <div class="register-page">
     <div class="register">
       <h1>Реєстрація користувача</h1>
+      <div v-if="error" class="error-message">
+        {{ error }}
+      </div>
       <form @submit.prevent="handleRegister" class="registration-form">
+        <div class="form-group">
+          <label for="name">
+            Name <span class="required">*</span>
+          </label>
+          <input
+            type="text"
+            id="name"
+            v-model="name"
+            placeholder="Введіть ім'я"
+            required
+          />
+        </div>
         <div class="form-group">
           <label for="email">
             Email <span class="required">*</span>
@@ -45,26 +57,38 @@ export default {
   name: 'RegistrationView',
   setup() {
     const router = useRouter()
+    const name = ref('')
     const email = ref('')
     const password = ref('')
-    const error = ref(null)
+    const error = ref('')
 
     const handleRegister = async () => {
       try {
+        error.value = '' // Clear previous errors
         const response = await authService.register({
+          name: name.value,
           email: email.value,
           password: password.value
         })
+        console.log('Registration successful:', response)
+        
         // After successful registration, login the user
         const loginResponse = await authService.login(email.value, password.value)
         localStorage.setItem('token', loginResponse.access_token)
         router.push('/')
       } catch (err) {
+        console.error('Registration error:', err)
         error.value = err.response?.data?.detail || 'Registration failed'
       }
     }
 
-    return { email, password, error, handleRegister }
+    return { 
+      name,
+      email, 
+      password, 
+      error, 
+      handleRegister 
+    }
   }
 }
 </script>
@@ -146,5 +170,19 @@ button {
 
 button:hover {
   background-color: #0056b3;
+}
+.error-message {
+  color: #dc3545;
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+  padding: 10px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+button:disabled {
+  background: #cccccc;
+  cursor: not-allowed;
 }
 </style>
