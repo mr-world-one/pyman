@@ -1,68 +1,113 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession  # Імпортуємо AsyncSession
-from sqlalchemy.future import select  # Для асинхронних запитів
-from app.schemas.schema import UserCreate, Token
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from app.schemas.schema import UserCreate, Token, UserResponse
 from app.models.model import User
 from app.database import get_db
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
-from typing import Optional  # Імпортуємо для використання Optional
+from typing import Optional
+import logging
 
-# Конфігурація JWT
-SECRET_KEY = "your_secret_key"
+# Configure logging
+logger = logging.getLogger(__name__)
+
+# JWT Configuration - Move to .env later
+SECRET_KEY = "83daa0256a2359b0fb23693bf1f6034d44396675749244721a2b20v896e11622"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
-# Хешування паролів
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    return email
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-router = APIRouter()
-
-# Функція хешування пароля
-def get_password_hash(password: str):
+def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
-# Функція перевірки пароля
-def verify_password(plain_password, hashed_password):
+def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
-# Генерація JWT-токена
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-# Реєстрація нового користувача
-@router.post("/register", response_model=Token)
-async def register_user(user: UserCreate, db: AsyncSession = Depends(get_db)):  # Використовуємо AsyncSession
-    # Виконуємо асинхронний запит для перевірки, чи існує користувач
-    result = await db.execute(select(User).filter(User.email == user.email))
-    db_user = result.scalar_one_or_none()
+@router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
+async def register_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
+    try:
+        # Check if user exists
+        result = await db.execute(select(User).filter(User.email == user.email))
+        db_user = result.scalar_one_or_none()
+        
+        if db_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered"
+            )
+        
+        # Create new user
+        hashed_password = get_password_hash(user.password)
+        new_user = User(
+            name=user.name,  # Add name field
+            email=user.email,
+            hashed_password=hashed_password
+        )
+        
+        db.add(new_user)
+        await db.commit()
+        await db.refresh(new_user)
+        
+        # Generate token
+        access_token = create_access_token(data={"sub": new_user.email})
+        logger.info(f"User registered successfully: {new_user.email}")
+        return {"access_token": access_token, "token_type": "bearer"}
     
-    if db_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    hashed_password = get_password_hash(user.password)
-    new_user = User(name=user.name, email=user.email, hashed_password=hashed_password)  # Виправлено тут
-    
-    db.add(new_user)
-    await db.commit()  # Використовуємо асинхронний commit
-    await db.refresh(new_user)  # Оновлюємо користувача після коміту
-    
-    access_token = create_access_token(data={"sub": new_user.name})
-    return {"access_token": access_token, "token_type": "bearer"}
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Registration failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Registration failed: {str(e)}"
+        )
 
-
-# Авторизація користувача
 @router.post("/login", response_model=Token)
-async def login(user: UserCreate, db: AsyncSession = Depends(get_db)):  # Використовуємо AsyncSession
-    result = await db.execute(select(User).filter(User.email == user.email))
-    db_user = result.scalar_one_or_none()
+async def login(user: UserCreate, db: AsyncSession = Depends(get_db)):
+    try:
+        result = await db.execute(select(User).filter(User.email == user.email))
+        db_user = result.scalar_one_or_none()
 
-    if not db_user or not verify_password(user.password, db_user.hashed_password):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        if not db_user or not verify_password(user.password, db_user.hashed_password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid credentials"
+            )
+        
+        access_token = create_access_token(data={"sub": db_user.email})
+        logger.info(f"User logged in successfully: {db_user.email}")
+        return {"access_token": access_token, "token_type": "bearer"}
     
-    access_token = create_access_token(data={"sub": db_user.name})
-    return {"access_token": access_token, "token_type": "bearer"}
+    except Exception as e:
+        logger.error(f"Login failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Login failed"
+        )

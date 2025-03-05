@@ -1,5 +1,5 @@
 #Third-party imports
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 import asyncpg
 import os
 from dotenv import load_dotenv
@@ -8,21 +8,30 @@ import logging
 from fastapi.middleware.cors import CORSMiddleware
 
 #Local imports
+from app.routers import crud, xpath
+from app.routers.authorization import get_current_user
 from app.routers import temporary_router, xpath, authorization as auth_router
 from app.database import Base
 from app.db_test import verify_database_connection
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 load_dotenv()
-app = FastAPI()
+app = FastAPI(
+    title="CheckIT API",
+    description="API for tender checking and analysis",
+    version="1.0.0"
+)
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Vite default port
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -68,18 +77,29 @@ async def startup():
             detail=f"Application startup failed: {str(e)}"
         )
 
-app.include_router(temporary_router.router)
-app.include_router(auth_router.router)  # Додаємо авторизацію
+# Include routers with authentication
+app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
+app.include_router(
+    crud.router,
+    prefix="/api",
+    tags=["CRUD Operations"],
+    dependencies=[Depends(get_current_user)]  # Protect all CRUD routes
+)
+app.include_router(
+    xpath.router,
+    prefix="/xpath",
+    tags=["XPath Operations"],
+    dependencies=[Depends(get_current_user)]  # Protect all XPath routes
+)
 app.include_router(authentication.router)
-app.include_router(xpath.router)
+app.include_router(temporary_router.router)
 
-@app.get("/")
-def home() -> dict:
-    return {"msg": "HomePage"}
-
-@app.get("/test-db")
-async def test_database():
-    return await test_db_connection()
+@app.get("/", tags=["Root"])
+async def home() -> dict:
+    return {
+        "message": "Welcome to CheckIT API",
+        "documentation": "/docs"
+    }
 
 async def test_db_connection():
     try:
