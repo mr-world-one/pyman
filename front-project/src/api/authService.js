@@ -22,15 +22,14 @@ export const authService = {
 
     async register(userData) {
         try {
-            const response = await apiClient.post('/auth/register', {
+          const response = await apiClient.post('/auth/auth/register', {
                 email: userData.email,
-                password: userData.password,
-                name: userData.name
-            })
+                name: userData.name,
+                password: userData.password
+          })
             if (response.data.access_token) {
                 localStorage.setItem('token', response.data.access_token)
-                apiClient.defaults.headers.common['Authorization'] = 
-                    `Bearer ${response.data.access_token}`
+                apiClient.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
             }
             return response.data
         } catch (error) {

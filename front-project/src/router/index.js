@@ -52,7 +52,7 @@ const router = createRouter({
 // Navigation guard
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
-  const publicPages = ['/signin', '/register', '/', '/about']
+  const publicPages = ['/signin', '/register', '/', '/about', '/excel-page', '/search-tender']
   const authRequired = !publicPages.includes(to.path)
 
   if (authRequired && !token) {
