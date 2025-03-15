@@ -2,7 +2,8 @@
   <div class="signin-page">
     <div class="signin">
       <h1>Увійдіть у свій акаунт</h1>
-      <form class="signin-form" @submit.prevent="login">
+      <div v-if="error" class="error-message">{{ error }}</div>
+      <form class="signin-form" @submit.prevent="handleLogin">
         <div class="form-group">
           <label for="email">Електронна пошта<span class="required">*</span></label>
           <input type="email" id="email" v-model="email" placeholder="Введіть вашу електронну пошту" required />
@@ -11,7 +12,9 @@
           <label for="password">Пароль<span class="required">*</span></label>
           <input type="password" id="password" v-model="password" placeholder="Введіть ваш пароль" required />
         </div>
-        <button type="submit">Увійти</button>
+        <button type="submit" :disabled="loading" @click="console.log('Button clicked')">
+          {{ loading ? 'Вхід...' : 'Увійти' }}
+        </button>
       </form>
       <p class="register-link">
         Ще не зареєстровані? <router-link to="/register">Зареєструйтеся!</router-link>
@@ -21,19 +24,49 @@
 </template>
 
 <script>
+  import { ref } from 'vue';
+  import { authService } from '@/api/authService';
+  import { useRouter } from 'vue-router';
+
   export default {
     name: 'SignIn',
-    data() {
-      return {
-        email: '',
-        password: ''
+    setup() {
+      const router = useRouter();
+      const email = ref('');
+      const password = ref('');
+      const error = ref('');
+      const loading = ref(false);
+
+      const handleLogin = async () => {
+        console.log('handleLogin called with:', { email: email.value, password: password.value });
+        if (loading.value) return; // Запобігаємо повторним клікам
+        loading.value = true;
+
+        try {
+          error.value = ''; // Очищаємо попередні помилки
+          const response = await authService.login(email.value, password.value);
+          console.log('Успішний вхід, response:', response);
+          if (response.access_token) {
+            console.log('Token saved, redirecting to /');
+            router.push('/');
+          } else {
+            throw new Error('No access token in response');
+          }
+        } catch (err) {
+          console.error('Помилка входу:', err);
+          error.value = err.response?.data?.detail || err.message || 'Помилка входу. Перевірте email або пароль';
+        } finally {
+          loading.value = false;
+        }
       };
-    },
-    methods: {
-      login() {
-        console.log("Вхід: ", this.email, this.password);
-        // Додайте логіку входу тут
-      }
+
+      return {
+        email,
+        password,
+        error,
+        loading,
+        handleLogin
+      };
     }
   };
 </script>
@@ -114,9 +147,24 @@
     transition: background 0.3s;
   }
 
-    button:hover {
+    button:hover:not(:disabled) {
       background-color: #0056b3;
     }
+
+    button:disabled {
+      background: #cccccc;
+      cursor: not-allowed;
+    }
+
+  .error-message {
+    color: #dc3545;
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 20px;
+    text-align: center;
+  }
 
   .register-link {
     margin-top: 1.5rem;

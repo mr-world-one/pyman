@@ -1,4 +1,4 @@
-#Third-party imports
+# Third-party imports
 from fastapi import FastAPI, HTTPException, Depends
 import asyncpg
 import os
@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 import logging
 from fastapi.middleware.cors import CORSMiddleware
 
-#Local imports
+# Local imports
 from app.routers import crud, xpath
 from app.routers.authorization import router as auth_router, get_current_user
 from app.database import Base
@@ -30,7 +30,12 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:5176", "http://localhost:5177",
+        "http://localhost:5178", "http://localhost:5179", "http://localhost:5180", "http://localhost:5181", "http://localhost:5182",
+        "http://127.0.0.1:5173", "http://127.0.0.1:5174", "http://127.0.0.1:5175", "http://127.0.0.1:5176", "http://127.0.0.1:5177",
+        "http://127.0.0.1:5178", "http://127.0.0.1:5179", "http://127.0.0.1:5180", "http://127.0.0.1:5181", "http://127.0.0.1:5182"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -39,11 +44,9 @@ app.add_middleware(
 # Database initialization
 async def init_db():
     try:
-        # First verify the connection
         if not await verify_database_connection():
             raise Exception("Database connection verification failed")
 
-        # Create SQLAlchemy engine
         engine = create_async_engine(
             os.getenv("DATABASE_URL"),
             echo=True,
@@ -82,13 +85,13 @@ app.include_router(
     crud.router,
     prefix="/api",
     tags=["CRUD Operations"],
-    dependencies=[Depends(get_current_user)]  # Protect all CRUD routes
+    dependencies=[Depends(get_current_user)]
 )
 app.include_router(
     xpath.router,
     prefix="/xpath",
     tags=["XPath Operations"],
-    dependencies=[Depends(get_current_user)]  # Protect all XPath routes
+    dependencies=[Depends(get_current_user)]
 )
 
 @app.get("/", tags=["Root"])
@@ -100,7 +103,6 @@ async def home() -> dict:
 
 async def test_db_connection():
     try:
-        # Test raw connection
         conn = await asyncpg.connect(
             user=os.getenv("POSTGRES_USER"),
             password=os.getenv("POSTGRES_PASSWORD"),

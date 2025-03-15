@@ -1,9 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from app.schemas.schema import UserCreate, Token, UserResponse
+from app.schemas.schema import UserCreate, UserLogin, Token, UserResponse
 from app.models.model import User
 from app.database import get_db
 from passlib.context import CryptContext
@@ -54,7 +53,6 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 @router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
 async def register_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
     try:
-        # Check if user exists
         result = await db.execute(select(User).filter(User.email == user.email))
         db_user = result.scalar_one_or_none()
         
@@ -64,10 +62,9 @@ async def register_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
                 detail="Email already registered"
             )
         
-        # Create new user
         hashed_password = get_password_hash(user.password)
         new_user = User(
-            name=user.name,  # Add name field
+            name=user.name,
             email=user.email,
             hashed_password=hashed_password
         )
@@ -76,7 +73,6 @@ async def register_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
         await db.commit()
         await db.refresh(new_user)
         
-        # Generate token
         access_token = create_access_token(data={"sub": new_user.email})
         logger.info(f"User registered successfully: {new_user.email}")
         return {"access_token": access_token, "token_type": "bearer"}
@@ -90,7 +86,7 @@ async def register_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
         )
 
 @router.post("/login", response_model=Token)
-async def login(user: UserCreate, db: AsyncSession = Depends(get_db)):
+async def login(user: UserLogin, db: AsyncSession = Depends(get_db)):
     try:
         result = await db.execute(select(User).filter(User.email == user.email))
         db_user = result.scalar_one_or_none()
