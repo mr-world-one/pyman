@@ -2,6 +2,7 @@ from scraper.parsers.base_parser import BaseParser
 from scraper.parsers.xpaths import CitadelProductXPaths
 import re
 
+
 class CitadelParser(BaseParser):
 
     xpaths = CitadelProductXPaths()
@@ -9,11 +10,11 @@ class CitadelParser(BaseParser):
     def __init__(self):
         super().__init__()
 
-    def _normalize_price(self, price : str):
+    def normalize_price(self, price: str):
         # citadel provides price in the following format: *** грн.
         match = re.search(r'\d+', price)
         return float(match.group()) if match else None
-    
+
     def info_about_product(self, url):
         data = super().info_about_product(url, self.xpaths)
         if data['price'] == data['price_on_sale']:
