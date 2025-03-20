@@ -48,12 +48,12 @@ def retry_on_timeout(max_attempts=MAX_ATTEMPTS, delay=DELAY):
                     if attempt == max_attempts:
                         final_message = f"Failed after {max_attempts} attempts in {func.__name__}"
                         logger.exception(final_message)
-                        raise TimeoutException(
+                        raise Exception(
                             final_message) from last_exception
                     attempt += 1
                     time.sleep(delay)
-
-            raise last_exception
+            if last_exception:
+                raise last_exception
         return wrapper
     return decorator
 
@@ -85,12 +85,12 @@ def retry_on_stale_element(max_attempts=MAX_ATTEMPTS, delay=DELAY):
                     if attempt == max_attempts:
                         final_message = f"Failed after {max_attempts} attempts in {func.__name__}"
                         logger.exception(final_message)
-                        raise StaleElementReferenceException(
+                        raise Exception(
                             final_message) from last_exception
                     attempt += 1
                     time.sleep(delay)
-
-            raise last_exception
+            if last_exception:
+                raise last_exception
         return wrapper
     return decorator
 
@@ -285,14 +285,18 @@ class BaseParser:
             self.open_page(url)
 
         try:
-            return self._parse_price(xpath=self.website_info.product_xpaths.PRICE, ignore_price_format=ignore_price_format)
+            price = self._parse_price(
+                xpath=self.website_info.product_xpaths.PRICE, ignore_price_format=ignore_price_format)
+            return price
         except PriceIsNotNormalizedException:
             raise
         except Exception:
-            message = f"{self.website_info}: Couldn't get price with {self.website_info.product_xpaths.PRICE}, maybe product is not on sale."
+            message = f"{self.website_info}: Couldn't get price with {self.website_info.product_xpaths.PRICE}, maybe product is on sale."
             logger.error(message)
             try:
-                return self._parse_price(xpath=self.website_info.product_xpaths.PRICE_WITHOUT_SALE, ignore_price_format=ignore_price_format)
+                price_without_sale = self._parse_price(
+                    xpath=self.website_info.product_xpaths.PRICE_WITHOUT_SALE, ignore_price_format=ignore_price_format)
+                return price_without_sale
             except Exception as e:
                 message = f"{self.website_info}: Couldn't get price with {self.website_info.product_xpaths.PRICE_WITHOUT_SALE}, unknown reason"
                 logger.exception(message)
@@ -446,7 +450,8 @@ class BaseParser:
             raise InvalidPageException(message)
 
         try:
-            self.driver.get(url)
+            if self.driver.current_url != url:
+                self.driver.get(url)
 
         except TimeoutException as e:
             message = f"Timeout while loading page: {url}"
@@ -487,7 +492,7 @@ class BaseParser:
     def info_about_product(self, url: str, fast_parse: bool = True, ignore_price_format: bool = False,
                            raise_exception: bool = False) -> 'ProductInfo':
         self.open_page(url)
-        price, is_on_sale, price_on_sale, is_available = None, None, None, None
+        price, is_on_sale, price_on_sale, is_available, title = None, None, None, None, None
         if fast_parse:
             try:
                 price = self.get_price(
@@ -519,7 +524,7 @@ class BaseParser:
 
     @retry_on_stale_element()
     @retry_on_timeout()
-    def _send_keys(self, element: WebElement, keys: str | Keys):
+    def _send_keys(self, xpath: str, keys: str | Keys):
         """
         Sends keys to the specified element.
 
@@ -533,6 +538,7 @@ class BaseParser:
         :raises UnableToSendKeysException: If unable to send keys to the element.
         """
         try:
+            element = self._parse_elements(xpath=xpath, multiple=False)
             element.send_keys(keys)
         except (TimeoutException, StaleElementReferenceException):
             raise
@@ -543,7 +549,7 @@ class BaseParser:
 
     @retry_on_stale_element()
     @retry_on_timeout()
-    def _press_button(self, button: WebElement):
+    def _press_button(self, xpath: str):
         """
         Clicks the specified button.
 
@@ -555,6 +561,7 @@ class BaseParser:
         :raises UnableToPressButtonException: If the button cannot be clicked.
         """
         try:
+            button = self._parse_elements(xpath, multiple=False)
             button.click()
         except (TimeoutException, StaleElementReferenceException):
             raise
@@ -572,23 +579,22 @@ class BaseParser:
             raise UnableToOpenSearchResultsException(message)
 
         try:
-            search_field = self._parse_elements(
-                self.website_info.website_navigation.SEARCH_FIELD)
-            self._send_keys(search_field, product)
+            self._send_keys(
+                self.website_info.website_navigation.SEARCH_FIELD, product)
         except Exception as e:  # general exception because _parse_elements has tried multiple times to load element but failed
             message = "Search field not found."
             logger.exception(message)
             raise UnableToOpenSearchResultsException(message) from e
 
         try:
-            self._send_keys(search_field, Keys.ENTER)
+            self._send_keys(
+                self.website_info.website_navigation.SEARCH_FIELD, Keys.ENTER)
         except Exception as e:  # _send_keys tried multiple times
             logger.error(
                 "Failed to use ENTER key, attempting to click submit button.")
             try:
-                submit_button = self._parse_elements(
+                self._press_button(
                     self.website_info.website_navigation.SUBMIT_BUTTON)
-                self._press_button(submit_button)
             except Exception as e:
                 message = f'Unable to press enter and press search_button'
                 logger.exception(message)
@@ -637,7 +643,6 @@ class BaseParser:
         self._open_search_results(product)
 
         product_urls = self._search_results_get_products_urls(n)
-        print(product_urls)
 
         products = []
         for product_url in product_urls:

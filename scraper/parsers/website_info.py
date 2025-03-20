@@ -1,6 +1,5 @@
 from scraper.parsers.xpaths import ProductXpaths, WebsiteNavigationXPaths
 
-
 class WebsiteInfo:
     def __init__(self, url: str, price_format: str, product_xpaths: ProductXpaths, website_navigation: WebsiteNavigationXPaths):
         self.url = url

@@ -1,50 +1,49 @@
 import unittest
 from scraper.parsers.silpo_parser import SilpoParser
 
-class TestRozetkaParser(unittest.TestCase):
+class TestSilpoParser(unittest.TestCase):
     
-    def setUp(self):
-        self.parser = SilpoParser()
+    @classmethod
+    def setUpClass(cls):
+        cls.parser = SilpoParser()
 
-    def test_info_product_on_sale(self):
+    def test_info_product_1(self):
         url = 'https://silpo.ua/product/ridkyi-zasib-frosch-dlia-prannia-kolorovykh-rechei-134375'
 
-        info = self.parser.info(url)
+        product_info = self.parser.info_about_product(url, fast_parse=False)
 
-        self.assertEqual(info['price'], 579)
-        self.assertEqual(info['price_on_sale'], 349)
+        self.assertEqual(product_info.url, url)
+        self.assertTrue((500 < product_info.price < 600) and (product_info.price > product_info.price_on_sale))
+        self.assertTrue(product_info.is_on_sale)
+        self.assertTrue(300 < product_info.price_on_sale < 400)
+        self.assertFalse(product_info.is_available)
+        self.assertIsNotNone(product_info.title)
     
-    def test_info_product_not_on_sale(self):
+    def test_info_product_2(self):
         url = 'https://silpo.ua/product/korm-dlia-kotiv-sheba-black-gold-z-indychkoiu-v-zhele-712556'
 
-        info = self.parser.info(url)
+        product_info = self.parser.info_about_product(url, fast_parse=False)
 
-        self.assertEqual(info['price'], 29.19)
-        self.assertIsNone(info['price_on_sale'])
+        self.assertEqual(product_info.url, url)
+        self.assertTrue(20 < product_info.price < 30)
+        self.assertFalse(product_info.is_on_sale)
+        self.assertIsNone(product_info.price_on_sale)
+        self.assertTrue(product_info.is_available)
+        self.assertIsNotNone(product_info.title)
 
-    def test_info_product_is_not_available(self):
-        url = 'https://silpo.ua/product/ridkyi-zasib-frosch-dlia-prannia-kolorovykh-rechei-134375'
+    def is_not_empty(self, product):
+        result = (not product.title is None) and (not product.price is None)
+        return result
 
-        info = self.parser.info(url)
+    def test_basic_search(self):
+        result = self.parser.find_n_products('сік садочок', 2)
+        self.assertTrue(len(result) != 0)
+        for product in result:
+            self.assertTrue(self.is_not_empty(product))
 
-        self.assertEqual(info['is_available'], False)
-
-    def test_info_product_is_available(self):
-        url = 'https://silpo.ua/product/korm-dlia-kotiv-sheba-black-gold-z-indychkoiu-v-zhele-712556'
-
-        info = self.parser.info(url)
-
-        self.assertEqual(info['is_available'], True)
-
-    def test_info_title(self):
-        url = 'https://silpo.ua/product/korm-dlia-kotiv-sheba-black-gold-z-indychkoiu-v-zhele-712556'
-
-        info = self.parser.info(url)
-
-        self.assertEqual(info['title'], 'Корм для котів Sheba Black&Gold з індичкою в желе, 85г')
-
-    def tearDown(self):
-        self.parser.close()
+    @classmethod
+    def tearDownClass(cls):
+        cls.parser._close()
 
 def run_tests():
     unittest.main(exit=False)
