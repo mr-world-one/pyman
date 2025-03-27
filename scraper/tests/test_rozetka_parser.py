@@ -3,48 +3,77 @@ from scraper.parsers.rozetka_parser import RozetkaParser
 
 class TestRozetkaParser(unittest.TestCase):
     
-    def setUp(self):
+    @classmethod
+    def setUpClass(self):
         self.parser = RozetkaParser()
 
-    def test_info_product_on_sale(self):
-        url = 'https://rozetka.com.ua/348712653/p348712653/'
+    def test_info_product_on_sale_fast_parse_false(self):
+        url = 'https://rozetka.com.ua/ua/apple-mynk3sx-a/p448428581/'
 
-        info = self.parser.info(url)
+        product_info = self.parser.info_about_product(url, fast_parse=False)
 
-        self.assertEqual(info['price'], 360)
-        self.assertEqual(info['price_on_sale'], 319)
-    
-    def test_info_product_not_on_sale(self):
-        url = 'https://rozetka.com.ua/412737279/p412737279/'
+        self.assertEqual(product_info.url, url)
+        self.assertTrue(50000 < product_info.price < 70000)
+        self.assertTrue(product_info.is_on_sale)
+        self.assertTrue(50000 < product_info.price_on_sale < 70000 and product_info.price_on_sale < product_info.price)
+        self.assertTrue(product_info.is_available)
+        self.assertIsNotNone(product_info.title)
 
-        info = self.parser.info(url)
+    def test_info_product_on_sale_fast_parse_true(self):
+        url = 'https://rozetka.com.ua/ua/apple-mynk3sx-a/p448428581/'
 
-        self.assertEqual(info['price'], 277)
-        self.assertIsNone(info['price_on_sale'])
+        product_info = self.parser.info_about_product(url, fast_parse=True)
 
-    def test_info_product_is_not_available(self):
-        url = 'https://rozetka.com.ua/452784485/p452784485/'
+        self.assertEqual(product_info.url, url)
+        self.assertTrue(50000 < product_info.price < 70000)
+        self.assertIsNone(product_info.is_on_sale)
+        self.assertIsNone(product_info.price_on_sale)
+        self.assertIsNone(product_info.is_available)
+        self.assertIsNotNone(product_info.title)
 
-        info = self.parser.info(url)
+    def test_info_product_is_not_available_fast_parse_false(self):
+        url = 'https://rozetka.com.ua/ua/apple-mxwn3sx-a/p448428545/'
 
-        self.assertEqual(info['is_available'], False)
+        product_info = self.parser.info_about_product(url, fast_parse=False)
 
-    def test_info_product_is_available(self):
-        url = 'https://rozetka.com.ua/412737279/p412737279/'
+        self.assertEqual(product_info.url, url)
+        self.assertTrue(50000 < product_info.price < 70000)
+        self.assertTrue(product_info.is_on_sale)
+        self.assertTrue(50000 < product_info.price_on_sale < 70000 and product_info.price_on_sale < product_info.price)
+        self.assertFalse(product_info.is_available)
+        self.assertIsNotNone(product_info.title)
 
-        info = self.parser.info(url)
+    def test_info_product_is_not_available_fast_parse_true(self):
+        url = 'https://rozetka.com.ua/ua/apple-mxwn3sx-a/p448428545/'
 
-        self.assertEqual(info['is_available'], True)
+        product_info = self.parser.info_about_product(url, fast_parse=True)
 
-    def test_info_title(self):
-        url = 'https://rozetka.com.ua/412737279/p412737279/'
+        self.assertEqual(product_info.url, url)
+        self.assertTrue(50000 < product_info.price < 70000)
+        self.assertIsNone(product_info.is_on_sale)
+        self.assertIsNone(product_info.price_on_sale)
+        self.assertIsNone(product_info.is_available)
+        self.assertIsNotNone(product_info.title)
 
-        info = self.parser.info(url)
+    def is_not_empty(self, product):
+        result = (not product.title is None) and (not product.price is None)
+        return result
 
-        self.assertEqual(info['title'], 'Стів Джобс: людина, яка мислила по-іншому (М)')
+    def test_category_search(self):
+        result = self.parser.find_n_products('iphone 15', 2)
+        self.assertTrue(len(result) != 0)
+        for product in result:
+            self.assertTrue(self.is_not_empty(product))
 
-    def tearDown(self):
-        self.parser.close()
+    def test_basic_search(self):
+        result = self.parser.find_n_products('сік садочок', 2)
+        self.assertTrue(len(result) != 0)
+        for product in result:
+            self.assertTrue(self.is_not_empty(product))
+
+    @classmethod
+    def tearDownClass(self):
+        self.parser._close()
 
 def run_tests():
     unittest.main(exit=False)
