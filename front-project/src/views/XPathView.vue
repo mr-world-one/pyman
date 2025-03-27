@@ -12,12 +12,32 @@
         <h2>Додати X-Path</h2>
         <form @submit.prevent="handleAdd" class="xpath-form">
           <div class="form-group">
-            <label for="shop-url">Shop URL</label>
-            <input type="url" id="shop-url" v-model="shopUrl" placeholder="Введіть посилання на сайт" required />
+            <label for="shop-name">Назва магазину</label>
+            <input type="text" id="shop-name" v-model="formData.name" placeholder="Введіть назву магазину" required />
           </div>
           <div class="form-group">
-            <label for="xpath">X-Path</label>
-            <input type="text" id="xpath" v-model="xpath" placeholder="Введіть X-Path" required />
+            <label for="shop-url">Shop URL</label>
+            <input type="url" id="shop-url" v-model="formData.url" placeholder="Введіть посилання на сайт" required />
+          </div>
+          <div class="form-group">
+            <label for="title-xpath">Title X-Path</label>
+            <input type="text" id="title-xpath" v-model="formData.title_xpath" placeholder="Введіть X-Path для заголовка" required />
+          </div>
+          <div class="form-group">
+            <label for="available-xpath">Available X-Path</label>
+            <input type="text" id="available-xpath" v-model="formData.available_xpath" placeholder="Введіть X-Path для наявності" required />
+          </div>
+          <div class="form-group">
+            <label for="price-xpath">Price X-Path</label>
+            <input type="text" id="price-xpath" v-model="formData.price_xpath" placeholder="Введіть X-Path для ціни" required />
+          </div>
+          <div class="form-group">
+            <label for="price-without-sale-xpath">Price Without Sale X-Path</label>
+            <input type="text" id="price-without-sale-xpath" v-model="formData.price_without_sale_xpath" placeholder="Введіть X-Path для ціни без знижки" required />
+          </div>
+          <div class="form-group">
+            <label for="price-on-sale-xpath">Price On Sale X-Path</label>
+            <input type="text" id="price-on-sale-xpath" v-model="formData.price_on_sale_xpath" placeholder="Введіть X-Path для ціни зі знижкою" required />
           </div>
           <button type="submit">Додати X-Path</button>
         </form>
@@ -28,7 +48,31 @@
         <form @submit.prevent="handleEdit" class="xpath-form">
           <div class="form-group">
             <label for="shop-name-edit">Назва магазину</label>
-            <input type="text" id="shop-name-edit" v-model="shopName" placeholder="Введіть назву магазину" required />
+            <input type="text" id="shop-name-edit" v-model="formData.name" placeholder="Введіть назву магазину" required />
+          </div>
+          <div class="form-group">
+            <label for="shop-url-edit">Shop URL</label>
+            <input type="url" id="shop-url-edit" v-model="formData.url" placeholder="Введіть посилання на сайт" />
+          </div>
+          <div class="form-group">
+            <label for="title-xpath-edit">Title X-Path</label>
+            <input type="text" id="title-xpath-edit" v-model="formData.title_xpath" placeholder="Введіть X-Path для заголовка" />
+          </div>
+          <div class="form-group">
+            <label for="available-xpath-edit">Available X-Path</label>
+            <input type="text" id="available-xpath-edit" v-model="formData.available_xpath" placeholder="Введіть X-Path для наявності" />
+          </div>
+          <div class="form-group">
+            <label for="price-xpath-edit">Price X-Path</label>
+            <input type="text" id="price-xpath-edit" v-model="formData.price_xpath" placeholder="Введіть X-Path для ціни" />
+          </div>
+          <div class="form-group">
+            <label for="price-without-sale-xpath-edit">Price Without Sale X-Path</label>
+            <input type="text" id="price-without-sale-xpath-edit" v-model="formData.price_without_sale_xpath" placeholder="Введіть X-Path для ціни без знижки" />
+          </div>
+          <div class="form-group">
+            <label for="price-on-sale-xpath-edit">Price On Sale X-Path</label>
+            <input type="text" id="price-on-sale-xpath-edit" v-model="formData.price_on_sale_xpath" placeholder="Введіть X-Path для ціни зі знижкою" />
           </div>
           <button type="submit">Редагувати X-Path</button>
         </form>
@@ -39,7 +83,7 @@
         <form @submit.prevent="handleDelete" class="xpath-form">
           <div class="form-group">
             <label for="shop-name-delete">Назва магазину</label>
-            <input type="text" id="shop-name-delete" v-model="shopName" placeholder="Введіть назву магазину" required />
+            <input type="text" id="shop-name-delete" v-model="formData.name" placeholder="Введіть назву магазину" required />
           </div>
           <button type="submit">Видалити X-Path</button>
         </form>
@@ -56,33 +100,83 @@
     setup() {
       // Режим форми: 'add', 'edit', 'delete'
       const formType = ref('add')
-      // Поля для форми додавання
-      const shopUrl = ref('')
-      const xpath = ref('')
-      // Поле для редагування та видалення (назва магазину)
-      const shopName = ref('')
+      // Єдина форма для всіх операцій
+      const formData = ref({
+        name: '',
+        url: '',
+        title_xpath: '',
+        available_xpath: '',
+        price_xpath: '',
+        price_without_sale_xpath: '',
+        price_on_sale_xpath: ''
+      })
 
-      const handleAdd = () => {
-        console.log("Додавання X-Path:")
-        console.log("Shop URL:", shopUrl.value)
-        console.log("X-Path:", xpath.value)
-        alert(`Додано X-Path:\nShop URL: ${shopUrl.value}\nX-Path: ${xpath.value}`)
-        // Очистка полів форми
-        shopUrl.value = ''
-        xpath.value = ''
-      }
-      const handleEdit = () => {
-        console.log("Редагування X-Path для магазину:", shopName.value)
-        alert(`Редагувати X-Path для магазину: ${shopName.value}`)
-        shopName.value = ''
-      }
-      const handleDelete = () => {
-        console.log("Видалення X-Path для магазину:", shopName.value)
-        alert(`Видалити X-Path для магазину: ${shopName.value}`)
-        shopName.value = ''
+      const handleAdd = async () => {
+        try {
+          const response = await fetch('http://localhost:8000/stores', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: formData.value.name,
+              url: formData.value.url,
+              title_xpath: formData.value.title_xpath,
+              available_xpath: formData.value.available_xpath,
+              price_xpath: formData.value.price_xpath,
+              price_without_sale_xpath: formData.value.price_without_sale_xpath,
+              price_on_sale_xpath: formData.value.price_on_sale_xpath
+            })
+          })
+          const result = await response.json()
+          console.log("Додавання X-Path:", result)
+          alert(`Додано X-Path:\n${JSON.stringify(result, null, 2)}`)
+          formData.value = { ...formData.value, name: '', url: '', title_xpath: '', available_xpath: '', price_xpath: '', price_without_sale_xpath: '', price_on_sale_xpath: '' }
+        } catch (error) {
+          console.error("Помилка додавання:", error)
+          alert('Помилка при додаванні X-Path')
+        }
       }
 
-      return { formType, shopUrl, xpath, shopName, handleAdd, handleEdit, handleDelete }
+      const handleEdit = async () => {
+        try {
+          const response = await fetch(`http://localhost:8000/stores/${formData.value.name}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              url: formData.value.url || undefined,
+              title_xpath: formData.value.title_xpath || undefined,
+              available_xpath: formData.value.available_xpath || undefined,
+              price_xpath: formData.value.price_xpath || undefined,
+              price_without_sale_xpath: formData.value.price_without_sale_xpath || undefined,
+              price_on_sale_xpath: formData.value.price_on_sale_xpath || undefined
+            })
+          })
+          const result = await response.json()
+          console.log("Редагування X-Path:", result)
+          alert(`Редаговано X-Path для магазину: ${formData.value.name}`)
+          formData.value = { ...formData.value, name: '', url: '', title_xpath: '', available_xpath: '', price_xpath: '', price_without_sale_xpath: '', price_on_sale_xpath: '' }
+        } catch (error) {
+          console.error("Помилка редагування:", error)
+          alert('Помилка при редагуванні X-Path')
+        }
+      }
+
+      const handleDelete = async () => {
+        try {
+          const response = await fetch(`http://localhost:8000/stores/${formData.value.name}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' }
+          })
+          const result = await response.json()
+          console.log("Видалення X-Path:", result)
+          alert(`Видалено X-Path для магазину: ${formData.value.name}`)
+          formData.value = { ...formData.value, name: '' }
+        } catch (error) {
+          console.error("Помилка видалення:", error)
+          alert('Помилка при видаленні X-Path')
+        }
+      }
+
+      return { formType, formData, handleAdd, handleEdit, handleDelete }
     }
   }
 </script>

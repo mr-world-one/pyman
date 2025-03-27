@@ -63,8 +63,8 @@ export default {
               <ul>
                 <li><router-link to="/" @click="toggleMenu">Головна</router-link></li>
                 <li><router-link to="/about" @click="toggleMenu">Про нас</router-link></li>
-                <li v-if="!isAuthenticated"><router-link to="/register" @click="toggleMenu">Реєстрація</router-link></li>
-                <li v-if="!isAuthenticated"><router-link to="/signin" @click="toggleMenu">Увійти</router-link></li>
+                <li><router-link to="/register" @click="toggleMenu">Реєстрація</router-link></li>
+                <li><router-link to="/signin" @click="toggleMenu">Увійти</router-link></li>
                 <li v-if="!isAuthenticated"><router-link to="/xpath" @click="toggleMenu">X-Path</router-link></li>
                 <li v-if="!isAuthenticated"><router-link to="/excel-page" @click="toggleMenu">Excel tenders</router-link></li>
                 <li v-if="!isAuthenticated"><router-link to="/search-tender" @click="toggleMenu">Prozorro tenders</router-link></li>
@@ -96,7 +96,7 @@ export default {
     box-sizing: border-box;
     overflow-x: hidden;
     height: 100%;
-    background: url('@/assets/istockphoto-1368169112-612x612.jpg') no-repeat center;
+    background: url('@/assets/upscalemedia-transformed.jpeg') no-repeat center;
     background-size: cover;
   }
 
