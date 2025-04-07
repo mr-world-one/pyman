@@ -36,7 +36,7 @@ if __name__ == '__main__':
     successfull = 0
     try:
         while True:
-            citadel_demo(parser=CitadelParser())
+            rozetka_demo(parser=RozetkaParser())
             successfull += 1
     except Exception as e:
         print(e)
