@@ -15,7 +15,7 @@ from selenium.common.exceptions import TimeoutException, WebDriverException, Sta
 from typing import Union, List, Tuple
 from functools import wraps
 
-from scraper.parsers.website_info import WebsiteInfo
+from scraper.parsers.website import Website
 from scraper.utils.config import SELENIUM_OPTIONS, EXCPLICIT_TIMEOUT, IMPLICIT_TIMEOUT, SELENIUM_EXPERIMENTAL_OPTIONS, MAX_ATTEMPTS, DELAY
 
 logger = logging.getLogger(__name__)
@@ -120,11 +120,6 @@ class PriceIsNotNormalizedException(Exception):
         super().__init__(*args)
 
 
-class PageNotLoadedException(Exception):
-    def __init__(self, *args):
-        super().__init__(*args)
-
-
 class UnableToSendKeysException(Exception):
     def __init__(self, *args):
         super().__init__(*args)
@@ -136,11 +131,6 @@ class UnableToPressButtonException(Exception):
 
 
 class UnableToOpenSearchResultsException(Exception):
-    def __init__(self, *args):
-        super().__init__(*args)
-
-
-class UnableToGetProductInfoException(Exception):
     def __init__(self, *args):
         super().__init__(*args)
 
@@ -181,7 +171,7 @@ class ProductInfo:
 class BaseParser:
     """A base class for parsing web pages using Selenium WebDriver."""
 
-    def __init__(self, website_info: 'WebsiteInfo'):
+    def __init__(self, website_info: 'Website'):
         """
         Initializes the BaseParser with Selenium WebDriver and website information.
 
@@ -477,10 +467,10 @@ class BaseParser:
         """
         try:
             self.driver.quit()
-        except WebDriverException as e:
+        except WebDriverException:
             message = f"Failed to quit WebDriver"
             logger.exception(message)
-            raise WebDriverException(message) from e
+            raise
         except Exception as e:
             message = f"Failed to quit WebDriver"
             logger.exception(message)

@@ -1,6 +1,6 @@
 from scraper.parsers.rozetka_parser import RozetkaParser
 from scraper.parsers.silpo_parser import SilpoParser
-from scraper.parsers.website_info import * 
+from scraper.parsers.website import * 
 from scraper.parsers.epicentr_parser import EpicentrParser
 from scraper.parsers.citadel_parser import CitadelParser
 
@@ -36,7 +36,7 @@ if __name__ == '__main__':
     successfull = 0
     try:
         while True:
-            citadel_demo(parser=CitadelParser())
+            citadel_demo(parser=EpicentrParser())
             successfull += 1
     except Exception as e:
         print(e)
