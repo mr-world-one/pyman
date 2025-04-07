@@ -1,5 +1,4 @@
 from scraper.parsers.base_parser import BaseParser
-from scraper.parsers.xpaths import CustomProductXPaths
 import re
 
 class CustomParser(BaseParser):
