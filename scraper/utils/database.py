@@ -3,7 +3,7 @@ from psycopg2 import Error
 from dotenv import load_dotenv
 import os
 
-from scraper.parsers.website import ProductXpaths, NavigationXPaths, Website
+from scraper.parsers import ProductXpaths, NavigationXPaths, Website
 
 load_dotenv()
 
