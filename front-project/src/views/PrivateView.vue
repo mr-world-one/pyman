@@ -33,60 +33,59 @@
 </template>
 
 <script>
-    //import { ref } from 'vue';
-    //import axios from 'axios';
+    import { ref } from 'vue';
+    import axios from 'axios';
 
-    //export default {
-    //    name: 'ExcelUpload',
-    //    setup() {
-    //        const fileName = ref('');
-    //        const fileData = ref(null);
-    //        const fileInput = ref(null);
-    //        const comparisonData = ref(null);
+    export default {
+        name: 'ExcelUpload',
+        setup() {
+            const fileName = ref('');
+            const fileData = ref(null);
+            const fileInput = ref(null);
+            const comparisonData = ref(null);
 
-    //        const triggerFileInput = () => {
-    //            fileInput.value.click();
-    //        };
+            const triggerFileInput = () => {
+                fileInput.value.click();
+            };
 
-    //        const handleFileChange = (event) => {
-    //            const file = event.target.files[0];
-    //            if (file) {
-    //                fileName.value = file.name;
-    //                fileData.value = file;
-    //            }
-    //        };
+            const handleFileChange = (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    fileName.value = file.name;
+                    fileData.value = file;
+                }
+            };
 
-    //        const handleDrop = (event) => {
-    //            const files = event.dataTransfer.files;
-    //            if (files.length) {
-    //                const file = files[0];
-    //                fileName.value = file.name;
-    //                fileData.value = file;
-    //            }
-    //        };
+            const handleDrop = (event) => {
+                const files = event.dataTransfer.files;
+                if (files.length) {
+                    const file = files[0];
+                    fileName.value = file.name;
+                    fileData.value = file;
+                }
+            };
 
-    //        const handleUpload = async () => {
-    //            if (!fileData.value) return;
+            const handleUpload = async () => {
+                if (!fileData.value) return;
 
-    //            const formData = new FormData();
-    //            formData.append('file', fileData.value);
+                const formData = new FormData();
+                formData.append('file', fileData.value);
 
-    //            try {
-    //                const response = await axios.post('http://localhost:8000/upload-excel', formData, {
-    //                    headers: { 'Content-Type': 'multipart/form-data' },
-    //                });
-    //                comparisonData.value = response.data;
-    //                fileName.value = '';
-    //                fileData.value = null;
-    //            } catch (error) {
-    //                console.error('Помилка:', error);
-    //                alert('Сталася помилка під час обробки файлу');
-    //            }
-    //        };
+                try {
+                    const response = await axios.post('http://localhost:8000/upload-excel', formData, {
+                        headers: { 'Content-Type': 'multipart/form-data' },
+                    });
+                      comparisonData.value = response.data.data; // Оновлено для нового формату відповіді    //                fileName.value = '';
+                    fileData.value = null;
+                } catch (error) {
+                    console.error('Помилка:', error);
+                    alert('Сталася помилка під час обробки файлу');
+                }
+            };
 
-    //        return { fileName, fileData, fileInput, comparisonData, triggerFileInput, handleFileChange, handleDrop, handleUpload };
-    //    },
-    //};
+            return { fileName, fileData, fileInput, comparisonData, triggerFileInput, handleFileChange, handleDrop, handleUpload };
+        },
+    };
 </script>
 
 <style scoped>

@@ -186,6 +186,10 @@ async def upload_excel():
             ignore_price_format=True,
             raise_exception=False
         )
+        if not rozetka_data:
+            logger.warning("No products found")
+            return {"status": "warning", "message": "No products found", "data": []}
+        return {"status": "success", "message": "Products found", "data": rozetka_data}
     except Exception as e:
-        return "Error"
-    return "Success"
+        logger.error(f"Error in upload_excel: {str(e)}")
+        return {"status": "error", "message": str(e), "data": []}
