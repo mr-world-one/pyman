@@ -1,6 +1,10 @@
+#Third-party imports
 from fastapi import FastAPI
-from .routers import temporary_router, authorization as auth_router
+
+#Local imports
+from .routers import temporary_router, authorization as auth_router, xpath
 from app.database import engine, Base
+from app.routers.prozorro_router import prozorro_router
 
 app = FastAPI()
 
@@ -14,8 +18,9 @@ async def startup():
     await init_db()
 
 app.include_router(temporary_router.router)
+app.include_router(xpath.router)
+app.include_router(prozorro_router)
 app.include_router(auth_router.router)  # Додаємо авторизацію
-
 
 @app.get("/")
 def home() -> dict:
