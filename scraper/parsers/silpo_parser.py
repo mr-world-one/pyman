@@ -1,38 +1,37 @@
 from scraper.parsers.base_parser import BaseParser
-from scraper.parsers.website import Website, ProductXpaths, NavigationXPaths
-from scraper.parsers.base_parser import PriceIsNotNormalizedException, logger, PriceNotFoundException
+from scraper.parsers import Website, ProductXpaths, NavigationXPaths, logger
+from scraper.parsers.exceptions import PriceIsNotNormalizedException, PriceNotFoundException
 from scraper.utils.database import Database
-
 
 class SilpoParser(BaseParser):
 
     def __init__(self):
         self.db = Database()
-        
+
         website_info = self.db.get_website_info('https://silpo.ua')
-        
+
         if not website_info:
             print("Дані для SilpoParser не знайдено в базі, додаємо...")
             website_info = self._create_default_website()
             self.db.add_website(website_info)
-        
+
         super().__init__(website_info)
-        
+
     def _create_default_website(self):
         return Website(
-                url='https://silpo.ua',
-                price_format=r'\d+',
-                product_xpaths=ProductXpaths(price_on_sale='/html/body/sf-shop-silpo-root/shop-silpo-root-shell/silpo-shell-main/div/div[3]/silpo-product-product-page/div/div/div/div/div[2]/div/div/div[1]/div[1]',
-                    price_without_sale='/html/body/sf-shop-silpo-root/shop-silpo-root-shell/silpo-shell-main/div/div[3]/silpo-product-product-page/div/div/div/div/div[2]/div/div/div[1]/div[2]/div[1]',
-                    price='/html/body/sf-shop-silpo-root/shop-silpo-root-shell/silpo-shell-main/div/div[3]/silpo-product-product-page/div/div/div/div/div[2]/div/div/div[1]/div',
-                    availability='/html/body/sf-shop-silpo-root/shop-silpo-root-shell/silpo-shell-main/div/div[3]/silpo-product-product-page/div/div/div/div/div[2]/div/div/div[2]/shop-silpo-common-page-add-to-basket/div/div/button',
-                    title='/html/body/sf-shop-silpo-root/shop-silpo-root-shell/silpo-shell-main/div/div[3]/silpo-product-product-page/div/div/div/div/div[2]/div/h1',
-                    available_text='У кошик'),
-                website_navigation=NavigationXPaths(search_field='/html/body/sf-shop-silpo-root/shop-silpo-root-shell/silpo-shell-main/div/div[1]/silpo-shell-header/silpo-shell-desktop-header/div/div/div[1]/div[3]/silpo-search-suggestion/silpo-search-input/div/input',
-                    submit_button=None,
-                    search_result_products_xpath_templates='//shop-silpo-common-product-card/div/a',
-                    search_result_link_attribute='href')
-            )
+            url='https://silpo.ua',
+            price_format=r'\d+',
+            product_xpaths=ProductXpaths(price_on_sale='/html/body/sf-shop-silpo-root/shop-silpo-root-shell/silpo-shell-main/div/div[3]/silpo-product-product-page/div/div/div/div/div[2]/div/div/div[1]/div[1]',
+                                         price_without_sale='/html/body/sf-shop-silpo-root/shop-silpo-root-shell/silpo-shell-main/div/div[3]/silpo-product-product-page/div/div/div/div/div[2]/div/div/div[1]/div[2]/div[1]',
+                                         price='/html/body/sf-shop-silpo-root/shop-silpo-root-shell/silpo-shell-main/div/div[3]/silpo-product-product-page/div/div/div/div/div[2]/div/div/div[1]/div',
+                                         availability='/html/body/sf-shop-silpo-root/shop-silpo-root-shell/silpo-shell-main/div/div[3]/silpo-product-product-page/div/div/div/div/div[2]/div/div/div[2]/shop-silpo-common-page-add-to-basket/div/div/button',
+                                         title='/html/body/sf-shop-silpo-root/shop-silpo-root-shell/silpo-shell-main/div/div[3]/silpo-product-product-page/div/div/div/div/div[2]/div/h1',
+                                         available_text='У кошик'),
+            website_navigation=NavigationXPaths(search_field='/html/body/sf-shop-silpo-root/shop-silpo-root-shell/silpo-shell-main/div/div[1]/silpo-shell-header/silpo-shell-desktop-header/div/div/div[1]/div[3]/silpo-search-suggestion/silpo-search-input/div/input',
+                                                submit_button=None,
+                                                search_result_products_xpath_templates='//shop-silpo-common-product-card/div/a',
+                                                search_result_link_attribute='href')
+        )
 
     def get_price(self, url, ignore_price_format, open_page=True):
         if open_page:

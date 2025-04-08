@@ -1,5 +1,4 @@
-from scraper.parsers.base_parser import BaseParser
-import re
+from parsers.base_parser import BaseParser
 
 class CustomParser(BaseParser):
     def __init__(self, xpaths, price_format):

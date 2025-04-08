@@ -1,18 +1,18 @@
+from scraper.parsers import Website, ProductXpaths, NavigationXPaths
 from scraper.parsers.base_parser import BaseParser
-from scraper.parsers.website import Website, ProductXpaths, NavigationXPaths
 from scraper.utils.database import Database
 
 class EpicentrParser(BaseParser):
     def __init__(self):
         self.db = Database()
-        
+
         website_info = self.db.get_website_info('https://epicentrk.ua/')
-        
+
         if not website_info:
             print("Дані для Epicentr не знайдено в базі, додаємо...")
             website_info = self._create_default_website()
             self.db.add_website(website_info)
-        
+
         super().__init__(website_info)
 
     def _create_default_website(self):
