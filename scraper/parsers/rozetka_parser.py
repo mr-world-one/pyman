@@ -1,61 +1,46 @@
-from scraper.parsers.base_parser import BaseParser
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
-import re
+from scraper.parsers.website import Website, ProductXpaths, NavigationXPaths
+from scraper.parsers.base_parser import BaseParser, logger, UnableToGetNProductUrls
+from scraper.utils.database import Database
 
 class RozetkaParser(BaseParser):
+
     def __init__(self):
-        super().__init__()
-
-    @staticmethod
-    def parse_price(price):
-        # rozetka provides price in the following format: ***$
-        match = re.search(r'\d+', price)
-        return int(match.group()) if match else None
-
-    def info(self, url):
-        '''returns information about specific product 
-        format of data:
-        data = { 'url' : url, 'price' : price, 'sale_price' : sale_price, 'is_available' : is_available, 'title': title }'''
-        self.open_page(url)
-
-        data = {
-            'url': url,
-            'price': None,
-            'sale_price': None,
-            'is_available': False,
-            'title': None,
-        }
-
-        # if product is on sale
-        try:
-            sale_price_element = self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'product-price__big.product-price__big-color-red')))
-            price_element = self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'product-price__small.ng-star-inserted')))
-            data['sale_price'] = RozetkaParser.parse_price(sale_price_element.text)
-            data['price'] = RozetkaParser.parse_price(price_element.text)
-        except: 
-            # if product is not on sale
-            print('Product is not on sale')
-            try:
-                price_element = self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'product-price__big')))
-                data['price'] = RozetkaParser.parse_price(price_element.text)
-            except:
-                print('Unable to get price')
+        self.db = Database()
         
-        # if product is available
-        try:
-            self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'status-label.status-label--green.ng-star-inserted')))
-            data['is_available'] = True
-        except:
-            # product is not available that's OK
-            pass
+        website_info = self.db.get_website_info('https://rozetka.com.ua/ua/')
         
-        # trying to get title
+        if not website_info:
+            print("Дані для Rozetka не знайдено в базі, додаємо...")
+            website_info = self._create_default_website()
+            self.db.add_website(website_info)
+        
+        super().__init__(website_info)
+
+    def _create_default_website(self):
+        return Website(
+                url='https://rozetka.com.ua/ua/',
+                price_format=r'\d+',
+                product_xpaths=ProductXpaths(price_on_sale='//*[@id="#scrollArea"]/div[1]/div[2]/div/rz-product-main-info/div/div[2]/div/div[1]/p[2]',
+                    price_without_sale='//*[@id="#scrollArea"]/div[1]/div[2]/div/rz-product-main-info/div/div[2]/div/div[1]/p[1]',
+                    price='//*[@id="#scrollArea"]/div[1]/div[2]/div/rz-product-main-info/div/div[2]/div/div[1]/p',
+                    availability='//*[@id="#scrollArea"]/div[1]/div[2]/div/rz-product-main-info/div/div[2]/div/div[1]/rz-status-label/p',
+                    title='//*[@id="#scrollArea"]/div[1]/div[2]/div/rz-title-block/div/div[1]/div/h1',
+                    available_text='Є в наявності'),
+                website_navigation=NavigationXPaths(search_field='/html/body/rz-app-root/div/div[1]/rz-main-header/header/div/div/div/rz-search-suggest/form/div[1]/div/div/input',
+                    submit_button='/html/body/rz-app-root/div/div[1]/rz-main-header/header/div/div/div/rz-search-suggest/form/div[1]/button',
+                    search_result_products_xpath_templates='//rz-catalog-tile/app-goods-tile-default/div/div[2]/div[1]/rz-button-product-page[2]/rz-indexed-link/a',
+                    search_result_link_attribute='href'))
+
+    def find_n_products(self, product, n, fast_parse=True, raise_exception=False, ignore_price_format=True):
+        result = []
         try:
-            title_element = self.wait.until(EC.presence_of_element_located((By.XPATH, '/html[1]/body[1]/rz-app-root[1]/div[1]/div[1]/rz-product[1]/div[1]/rz-product-tab-main[1]/div[1]/div[1]/div[2]/div[1]/rz-title-block[1]/div[1]/div[1]/div[1]/h1[1]')))
-            data['title'] = title_element.text
+            result = super()._find_n_products(product, n, fast_parse=fast_parse,
+                                              raise_exception=raise_exception, ignore_price_format=ignore_price_format)
+            logger.info(f'Managed to parse {len(result)} products')
+
         except Exception as e:
-            print('Unable to get title')
-            print(e)
+            if raise_exception or len(result) == 0:
+                raise UnableToGetNProductUrls(
+                    f'Unable to find products ({len(result)} found)') from e
 
-        return data
+        return result
