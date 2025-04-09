@@ -14,7 +14,7 @@ import logging
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# JWT Configuration - Move to .env later
+# JWT Configuration - Move to .env later(dont forget to add!)
 SECRET_KEY = "83daa0256a2359b0fb23693bf1f6034d44396675749244721a2b20v896e11622"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
