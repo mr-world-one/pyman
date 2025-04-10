@@ -65,10 +65,10 @@ export default {
                 <li><router-link to="/about" @click="toggleMenu">Про нас</router-link></li>
                 <li><router-link to="/register" @click="toggleMenu">Реєстрація</router-link></li>
                 <li><router-link to="/signin" @click="toggleMenu">Увійти</router-link></li>
-                <li v-if="!isAuthenticated"><router-link to="/xpath" @click="toggleMenu">X-Path</router-link></li>
-                <li><router-link to="/excel-page" @click="toggleMenu">Excel tenders</router-link></li>
-                <li><router-link to="/search-tender" @click="toggleMenu">Prozorro tenders</router-link></li>
-                <li><a href="#" @click.prevent="handleLogout">Вийти</a></li>
+                <li v-if="isAuthenticated"><router-link to="/xpath" @click="toggleMenu">X-Path</router-link></li>
+                <li v-if="isAuthenticated"><router-link to="/excel-page" @click="toggleMenu">Excel tenders</router-link></li>
+                <li v-if="isAuthenticated"><router-link to="/search-tender" @click="toggleMenu">Prozorro tenders</router-link></li>
+                <li v-if="isAuthenticated"><a href="#" @click.prevent="handleLogout">Вийти</a></li>
               </ul>
             </div>
           </div>

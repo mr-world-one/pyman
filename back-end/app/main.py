@@ -10,6 +10,12 @@ from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 from scraper.parsers.rozetka_parser import RozetkaParser
 from fastapi import FastAPI, File, UploadFile
+from app.routers.prozorro_router import prozorro_router
+from statistics import mean
+import logging
+from io import BytesIO
+from openpyxl import load_workbook
+
 
 # Local imports
 from .routers import crud, xpath
@@ -98,6 +104,8 @@ app.include_router(
     tags=["XPath Operations"],
     dependencies=[Depends(get_current_user)]
 )
+app.include_router(prozorro_router)
+
 
 @app.get("/", tags=["Root"])
 async def home() -> dict:
@@ -174,22 +182,166 @@ async def test_db_connection():
 #     #     })
 #     return comp
 
-@app.post("/excel-page")
-async def upload_excel():
+
+# rozetka = RozetkaParser()
+# @app.get("/excel-page")
+# async def upload_excel():
+#     try:
+#         product = "iphone"
+#         rozetka_data = rozetka.find_n_products(
+#             product=product,
+#             n=2,
+#             fast_parse=False,
+#             ignore_price_format=True,
+#             raise_exception=False
+#         )
+#         if not rozetka_data:
+#             logger.warning("No products found")
+#             return {"status": "warning", "message": "No products found", "data": []}
+#         return {"status": "success", "message": "Products found", "data": rozetka_data}
+#     except Exception as e:
+#         logger.error(f"Error in upload_excel: {str(e)}")
+#         return {"status": "error", "message": str(e), "data": []}
+
+def parse_excel_file(file_content: bytes):
     try:
-        product = "iphone"
+        workbook = load_workbook(filename=BytesIO(file_content))
+        sheet = workbook.active
+        
+        headers = [cell.value for cell in sheet[1]]
+        required_columns = ['Назва товару', 'Кількість', 'Ціна', 'Сума']
+        
+        if not all(col in headers for col in required_columns):
+            raise ValueError("Excel file is missing required columns")
+        
+        col_indices = {header: idx for idx, header in enumerate(headers)}
+        
+        data = []
+        for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
+            quantity = row[col_indices['Кількість']]
+            price = row[col_indices['Ціна']]
+            total = row[col_indices['Сума']]
+            
+            if quantity is None or price is None or total is None:
+                logger.info(f"Skipping row {row_idx} due to empty values")
+                continue
+                
+            try:
+                row_data = {
+                    'product_name': row[col_indices['Назва товару']],
+                    'original_quantity': int(quantity),
+                    'original_price_uah': float(price),
+                    'original_total_uah': float(total),
+                    'rozetka_results': []
+                }
+                data.append(row_data)
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Skipping row {row_idx} due to invalid data: {str(e)}")
+                continue
+        
+        if not data:
+            raise ValueError("No valid data found in the Excel file")
+            
+        return data
+        
+    except Exception as e:
+        raise ValueError(f"Error parsing Excel file: {str(e)}")
+
+@app.post("/excel-page")
+async def upload_excel(file: UploadFile = File(...)):
+    try:
+        file_content = await file.read()
+        data = parse_excel_file(file_content)
         rozetka = RozetkaParser()
-        rozetka_data = rozetka.find_n_products(
-            product=product,
-            n=2,
-            fast_parse=True,
-            ignore_price_format=True,
-            raise_exception=False
-        )
-        if not rozetka_data:
-            logger.warning("No products found")
-            return {"status": "warning", "message": "No products found", "data": []}
-        return {"status": "success", "message": "Products found", "data": rozetka_data}
+        # Проходимо по кожному рядку і шукаємо продукти
+        for row in data:
+            product_name = row['product_name']
+            if not product_name or not isinstance(product_name, str):
+                logger.warning(f"Invalid product name in row: {row}")
+                continue
+                
+            logger.info(f"Searching for: '{product_name}'")
+            
+            try:
+                # Скидаємо будь-який внутрішній стан парсера, якщо це можливо
+                if hasattr(rozetka, 'clear_cache'):
+                    rozetka.clear_cache()
+                
+                # Виконуємо пошук для поточного товару
+                rozetka_data = rozetka.find_n_products(
+                    product=product_name.strip(),  # Видаляємо пробіли
+                    n=2,
+                    fast_parse=False,
+                    ignore_price_format=True,
+                    raise_exception=False
+                )
+                
+                if not rozetka_data:
+                    logger.warning(f"No products found for '{product_name}'")
+                else:
+                    for item in rozetka_data:
+                        item_dict = item.__dict__ if hasattr(item, '__dict__') else dict(item)
+                        # Перевіряємо, чи результат відповідає запиту
+                        if product_name.lower() not in item_dict.get('title', '').lower():
+                            logger.warning(f"Result '{item_dict.get('title', '')}' does not match '{product_name}'")
+                            continue
+                        row['rozetka_results'].append(item_dict)
+                    logger.info(f"Found {len(row['rozetka_results'])} relevant products for '{product_name}'")
+                    
+            except Exception as e:
+                logger.error(f"Error searching for '{product_name}': {str(e)}")
+                continue
+        
+        has_results = any(row['rozetka_results'] for row in data)
+        if not has_results:
+            logger.warning("No products found for any item")
+            return {"status": "warning", "message": "No products found for any item", "data": data}
+            
+        return {
+            "status": "success",
+            "message": "Products found",
+            "data": data
+        }
+        
+    except ValueError as ve:
+        logger.error(f"ValueError in upload_excel: {str(ve)}")
+        return {"status": "error", "message": str(ve), "data": []}
     except Exception as e:
         logger.error(f"Error in upload_excel: {str(e)}")
-        return {"status": "error", "message": str(e), "data": []}
+        return {"status": "error", "message": f"Unexpected error: {str(e)}", "data": []}
+
+# @app.post("/excel-page")
+# async def upload_excel(file: UploadFile = File(...)):
+#     try:
+#         file_content = await file.read()
+#         data = parse_excel_file(file_content)
+
+        
+#         d = []
+        
+#         for row in data:
+#             product_name = row['product_name']
+#             logger.info(f"Searching for: '{product_name}'")
+
+#             try:
+#                 rozetka_data = rozetka.find_n_products(
+#                     product=product_name,
+#                     n=2,
+#                     fast_parse=False,
+#                     ignore_price_format=True,
+#                     raise_exception=False
+#                 )
+#                 d.append(rozetka_data)
+#                 print("success" + str(e))
+#             except Exception as e:
+#                 print("No result" + str(e))
+#                 continue
+
+#     except Exception as e:
+#         return str(e)
+
+#     return {
+#         "status": "success",
+#         "message": "Products found",
+#         "data": d
+#     }
