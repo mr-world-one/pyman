@@ -17,6 +17,7 @@ from scraper.parsers import *
 from scraper.parsers.exceptions import *
 from scraper.utils import SELENIUM_OPTIONS, EXPLICIT_TIMEOUT, IMPLICIT_TIMEOUT, SELENIUM_EXPERIMENTAL_OPTIONS
 
+
 class BaseParser:
     """A base class for parsing web pages using Selenium WebDriver."""
 
@@ -39,9 +40,10 @@ class BaseParser:
             TypeError: If website_info is not of type Website
         """
         logger.debug("Starting BaseParser initialization")
-        
+
         if not isinstance(website_info, Website):
-            logger.error(f"Invalid website_info type: {type(website_info)}. Expected Website")
+            logger.error(
+                f"Invalid website_info type: {type(website_info)}. Expected Website")
             raise TypeError("website_info must be of type Website")
 
         self.website_info = website_info
@@ -49,13 +51,14 @@ class BaseParser:
 
         self.options = Options()
         self.driver = None
-        
+
         try:
             for option in SELENIUM_OPTIONS:
                 self.options.add_argument(option)
                 logger.debug(f"Added Selenium option: {option}")
-            
-            self.options.add_experimental_option('prefs', SELENIUM_EXPERIMENTAL_OPTIONS)
+
+            self.options.add_experimental_option(
+                'prefs', SELENIUM_EXPERIMENTAL_OPTIONS)
             logger.debug(f"Added experimental options: {SELENIUM_EXPERIMENTAL_OPTIONS}")
 
             logger.info("Initializing Chrome WebDriver")
@@ -65,12 +68,12 @@ class BaseParser:
             )
             self.driver.implicitly_wait(IMPLICIT_TIMEOUT)
             logger.debug(f"Set implicit wait to {IMPLICIT_TIMEOUT} seconds")
-            
+
             self.wait = WebDriverWait(self.driver, EXPLICIT_TIMEOUT)
             logger.debug(f"Initialized WebDriverWait with timeout {EXPLICIT_TIMEOUT} seconds")
-            
+
             logger.info("BaseParser initialization completed successfully")
-            
+
         except Exception as e:
             logger.error("Failed to initialize WebDriver", exc_info=True)
             if self.driver:
@@ -78,7 +81,8 @@ class BaseParser:
                     self.driver.quit()
                     logger.debug("Cleaned up WebDriver instance")
                 except Exception:
-                    logger.warning("Failed to clean up WebDriver during error handling")
+                    logger.warning(
+                        "Failed to clean up WebDriver during error handling")
             raise
 
     def normalize_price(self, price: str, ignore_price_format: bool) -> Union[float, str]:
@@ -103,33 +107,28 @@ class BaseParser:
             ValueError: If matched string cannot be converted to float
             AttributeError: If `self.website_info.price_format` is not defined or not a valid regex pattern
         """
-        logger.debug(f"Attempting to normalize price: '{price}'")
+        logger.debug(f"Attempting to normalize price")
 
         formatted_price = price.replace(' ', '').strip()
-        logger.debug(f"Formatted price after preprocessing: '{formatted_price}'")
 
         try:
             match = re.search(self.website_info.price_format, formatted_price)
             if match:
                 matched_price = match.group()
-                logger.debug(f"Price matched: '{matched_price}'")
                 try:
                     normalized_price = float(matched_price)
-                    logger.debug(f"Successfully normalized price to: {normalized_price}")
+                    logger.debug(f"Successfully normalized price to")
                     return normalized_price
                 except ValueError as e:
-                    logger.error(
-                        f"Failed to convert matched price '{matched_price}' to float",
-                        exc_info=True
-                    )
-                    raise ValueError(f"Cannot convert '{matched_price}' to float") from e
+                    logger.error(f"Failed to convert matched price to float", exc_info=True)
+                    raise ValueError(f"Cannot convert price to float") from e
 
             if ignore_price_format:
-                logger.warning(f"Price '{price}' not matched, returning original due to ignore_price_format=True")
+                logger.warning(f"Price not matched, returning original due to ignore_price_format=True")
                 return price
-            
+
             error_msg = (
-                f"Failed to normalize price '{price}' with pattern "
+                f"Failed to normalize price with pattern"
                 f"'{self.website_info.price_format}' for {self.website_info}"
             )
             logger.error(error_msg)
@@ -176,20 +175,24 @@ class BaseParser:
         try:
             if multiple:
                 logger.debug("Waiting for presence of all elements")
-                elements = self.wait.until(EC.presence_of_all_elements_located((By.XPATH, xpath)))
+                elements = self.wait.until(
+                    EC.presence_of_all_elements_located((By.XPATH, xpath)))
                 logger.debug(f"Found {len(elements)} elements matching XPath")
                 return elements
             else:
                 logger.debug("Waiting for presence of single element")
-                element = self.wait.until(EC.presence_of_element_located((By.XPATH, xpath)))
+                element = self.wait.until(
+                    EC.presence_of_element_located((By.XPATH, xpath)))
                 logger.debug("Found single element matching XPath")
                 return element
 
         except TimeoutException as e:
-            logger.error(f"Timeout waiting for elements with XPath: '{xpath}', multiple={multiple}", exc_info=True)
+            logger.error(
+                f"Timeout waiting for elements with XPath: '{xpath}', multiple={multiple}", exc_info=True)
             raise
         except Exception as e:
-            logger.error(f"Unexpected error parsing elements with XPath: '{xpath}'", exc_info=True)
+            logger.error(
+                f"Unexpected error parsing elements with XPath: '{xpath}'", exc_info=True)
             raise
 
     def get_price(self, url: str, ignore_price_format: bool, open_page: bool = True) -> Union[float, str]:
@@ -227,11 +230,12 @@ class BaseParser:
                 xpath=self.website_info.product_xpaths.PRICE,
                 ignore_price_format=ignore_price_format
             )
-            logger.debug(f"Successfully retrieved price: {price}")
+            logger.debug(f"Successfully retrieved price")
             return price
 
         except PriceIsNotNormalizedException as e:
-            logger.warning(f"Price normalization failed with primary XPath: {e}")
+            logger.warning(
+                f"Price normalization failed with primary XPath: {e}")
             raise
 
         except Exception as e:
@@ -247,7 +251,7 @@ class BaseParser:
                     xpath=self.website_info.product_xpaths.PRICE_WITHOUT_SALE,
                     ignore_price_format=ignore_price_format
                 )
-                logger.debug(f"Successfully retrieved fallback price: {price_without_sale}")
+                logger.debug(f"Successfully retrieved fallback price")
                 return price_without_sale
 
             except Exception as e:
@@ -290,11 +294,11 @@ class BaseParser:
                 xpath=self.website_info.product_xpaths.PRICE_ON_SALE,
                 ignore_price_format=ignore_price_format
             )
-            logger.debug(f"Successfully retrieved sale price: {price}")
+            logger.debug(f"Successfully retrieved sale price")
             return price
 
         except PriceIsNotNormalizedException as e:
-            logger.warning(f"Sale price normalization failed: {e}")
+            logger.warning(f"Sale price normalization failed")
             raise
 
         except (TimeoutException) as e:
@@ -305,7 +309,7 @@ class BaseParser:
             )
             logger.error(error_msg, exc_info=True)
             raise PriceNotFoundException(error_msg) from e
-        
+
         except Exception as e:
             error_msg = (
                 f"Unexpected failure getting sale price for {self.website_info} with "
@@ -338,14 +342,16 @@ class BaseParser:
         if open_page:
             self.open_page(url)
         try:
-            logger.debug(f"Parsing availability with XPath: {self.website_info.product_xpaths.AVAILABILITY}")
+            logger.debug(
+                f"Parsing availability with XPath: {self.website_info.product_xpaths.AVAILABILITY}")
             availability_element = self._parse_elements(
                 xpath=self.website_info.product_xpaths.AVAILABILITY,
                 multiple=False
             )
             availability_text = availability_element.text
             is_available = self.website_info.product_xpaths.AVAILABLE_TEXT in availability_text
-            logger.debug(f"Availability text: '{availability_text}', available: {is_available}")
+            logger.debug(
+                f"Availability text: '{availability_text}', available: {is_available}")
             return is_available
 
         except Exception as e:
@@ -395,7 +401,7 @@ class BaseParser:
                 ignore_price_format=ignore_price_format,
                 open_page=False
             )
-            logger.debug(f"Regular price retrieved: {price}")
+            logger.debug(f"Regular price retrieved")
         except Exception as e:
             logger.error(f"Failed to retrieve regular price for {url}", exc_info=True)
             raise
@@ -409,13 +415,12 @@ class BaseParser:
                 ignore_price_format=ignore_price_format,
                 open_page=False
             )
-            logger.debug(f"Sale price retrieved: {price_on_sale}")
+            logger.debug(f"Sale price retrieved")
         except Exception as e:
-            logger.debug(f"No sale price found for {url}, assuming regular price applies: {str(e)}")
+            logger.debug(f"No sale price found for {url}, assuming regular price applies")
 
         # Determine if product is on sale
         is_on_sale = price_on_sale is not None
-        logger.debug(f"Price details: regular={price}, sale={price_on_sale}, is_on_sale={is_on_sale}")
 
         return price, price_on_sale, is_on_sale
 
@@ -442,8 +447,10 @@ class BaseParser:
         if open_page:
             self.open_page(url)
         try:
-            logger.debug(f"Parsing title with XPath: {self.website_info.product_xpaths.TITLE}")
-            title_element = self._parse_elements(self.website_info.product_xpaths.TITLE)
+            logger.debug(
+                f"Parsing title with XPath: {self.website_info.product_xpaths.TITLE}")
+            title_element = self._parse_elements(
+                self.website_info.product_xpaths.TITLE)
             title_text = title_element.text or ""
             if not title_text:
                 logger.warning("Title element found but contains no text")
@@ -522,7 +529,8 @@ class BaseParser:
                 self.driver.get(url)
                 # Wait for page to be fully loaded
                 self.wait.until(
-                    lambda driver: driver.execute_script("return document.readyState") == "complete"
+                    lambda driver: driver.execute_script(
+                        "return document.readyState") == "complete"
                 )
                 logger.debug(f"Successfully loaded page: '{url}'")
             else:
@@ -582,7 +590,7 @@ class BaseParser:
         self._close()
 
     def info_about_product(self, url: str, fast_parse: bool = True, ignore_price_format: bool = False,
-                      raise_exception: bool = False) -> ProductInfo:
+                           raise_exception: bool = False) -> ProductInfo:
         """
         Gather comprehensive product information from a webpage.
 
@@ -606,7 +614,7 @@ class BaseParser:
             TitleNotFoundException: If title retrieval fails and raise_exception=True
         """
         logger.debug(f"Gathering product info for URL: '{url}', fast_parse={fast_parse}, "
-                    f"ignore_price_format={ignore_price_format}, raise_exception={raise_exception}")
+                     f"ignore_price_format={ignore_price_format}, raise_exception={raise_exception}")
 
         self.open_page(url)
 
@@ -622,9 +630,9 @@ class BaseParser:
                 price = self.get_price(
                     url=url, ignore_price_format=ignore_price_format, open_page=False
                 )
-                logger.debug(f"Regular price retrieved: {price}")
+                logger.debug(f"Regular price retrieved")
             except PriceNotFoundException as e:
-                logger.warning(f"Price not found in fast mode: {e}")
+                logger.warning(f"Price not found in fast mode")
                 if raise_exception:
                     raise
         else:
@@ -633,9 +641,8 @@ class BaseParser:
                 price, price_on_sale, is_on_sale = self.get_price_details(
                     url=url, ignore_price_format=ignore_price_format, open_page=False
                 )
-                logger.debug(f"Price details retrieved: price={price}, price_on_sale={price_on_sale}, is_on_sale={is_on_sale}")
             except PriceNotFoundException as e:
-                logger.warning(f"Price details not found: {e}")
+                logger.warning(f"Price details not found")
                 if raise_exception:
                     raise
 
@@ -658,7 +665,6 @@ class BaseParser:
                 raise
 
         product_info = ProductInfo(url, price, is_on_sale, price_on_sale, is_available, title)
-        logger.debug(f"Product info assembled: {product_info}")
         return product_info
 
     @retry_on_stale_element()
@@ -682,22 +688,25 @@ class BaseParser:
             TimeoutException: If element isn't found within timeout (after retries)
             StaleElementReferenceException: If element becomes stale (after retries)
         """
-        logger.debug(f"Sending keys to element with XPath: '{xpath}', keys: '{keys}'")
+        logger.debug(
+            # f"Sending keys to element with XPath: '{xpath}', keys: '{str(keys)}'")
+            f"Sending keys to element with XPath: '{xpath}''")
 
         try:
             logger.debug(f"Locating element with XPath: '{xpath}'")
             element = self._parse_elements(xpath=xpath, multiple=False)
             logger.debug("Element located, sending keys")
             element.send_keys(keys)
-            logger.debug(f"Keys '{keys}' sent successfully to element")
+            # logger.debug(f"Keys '{str(keys)}' sent successfully to element")
 
         except (TimeoutException, StaleElementReferenceException) as e:
             error_msg = f"Failed to send keys to element with XPath '{xpath}' due to timeout or staleness"
             logger.error(error_msg, exc_info=True)
-            raise  
+            raise
 
         except Exception as e:
-            error_msg = f"Failed to send keys '{keys}' to element with XPath '{xpath}'"
+            # error_msg = f"Failed to send keys '{str(keys)}' to element with XPath '{xpath}'"
+            error_msg = f"Failed to send keys to element with XPath '{xpath}'"
             logger.error(error_msg, exc_info=True)
             raise UnableToSendKeysException(error_msg) from e
 
@@ -740,6 +749,8 @@ class BaseParser:
             logger.error(error_msg, exc_info=True)
             raise UnableToPressButtonException(error_msg) from e
 
+    @retry_on_stale_element()
+    @retry_on_timeout()
     def _open_search_results(self, product: str) -> None:
         """
         Open search results page for a given product on the website.
@@ -768,8 +779,10 @@ class BaseParser:
             raise UnableToOpenSearchResultsException(error_msg) from e
 
         try:
-            logger.debug(f"Entering product name into search field with XPath: '{self.website_info.website_navigation.SEARCH_FIELD}'")
-            self._send_keys(self.website_info.website_navigation.SEARCH_FIELD, product)
+            logger.debug(
+                f"Entering product name into search field with XPath: '{self.website_info.website_navigation.SEARCH_FIELD}'")
+            self._send_keys(
+                self.website_info.website_navigation.SEARCH_FIELD, product)
             logger.debug(f"Product name '{product}' entered successfully")
         except Exception as e:
             error_msg = f"Search field not found with XPath '{self.website_info.website_navigation.SEARCH_FIELD}'"
@@ -778,13 +791,17 @@ class BaseParser:
 
         try:
             logger.debug("Submitting search with Enter key")
-            self._send_keys(self.website_info.website_navigation.SEARCH_FIELD, Keys.ENTER)
+            self._send_keys(
+                self.website_info.website_navigation.SEARCH_FIELD, Keys.ENTER)
             logger.debug("Search submitted successfully with Enter key")
         except Exception as e:
-            logger.warning(f"Failed to submit search with Enter key: {str(e)}. Attempting submit button.")
+            logger.warning(
+                f"Failed to submit search with Enter key: {str(e)}. Attempting submit button.")
             try:
-                logger.debug(f"Clicking submit button with XPath: '{self.website_info.website_navigation.SUBMIT_BUTTON}'")
-                self._press_button(self.website_info.website_navigation.SUBMIT_BUTTON)
+                logger.debug(
+                    f"Clicking submit button with XPath: '{self.website_info.website_navigation.SUBMIT_BUTTON}'")
+                self._press_button(
+                    self.website_info.website_navigation.SUBMIT_BUTTON)
                 logger.debug("Search submitted successfully with button")
             except Exception as e:
                 error_msg = (
@@ -819,21 +836,25 @@ class BaseParser:
 
         product_urls = []
         try:
-            logger.debug(f"Parsing product URL elements with XPath: '{self.website_info.website_navigation.SEARCH_RESULT_PRODUCTS_XPATH_TEMPLATES}'")
+            logger.debug(
+                f"Parsing product URL elements with XPath: '{self.website_info.website_navigation.SEARCH_RESULT_PRODUCTS_XPATH_TEMPLATES}'")
             product_url_elements = self._parse_elements(
                 xpath=self.website_info.website_navigation.SEARCH_RESULT_PRODUCTS_XPATH_TEMPLATES,
                 multiple=True
             )[:n]
-            logger.debug(f"Found {len(product_url_elements)} product URL elements (limited to {n})")
+            logger.debug(
+                f"Found {len(product_url_elements)} product URL elements (limited to {n})")
 
             for url_element in product_url_elements:
                 attribute = self.website_info.website_navigation.SEARCH_RESULT_LINK_ATTRIBUTE
                 product_url = url_element.get_attribute(attribute)
                 if product_url:
                     product_urls.append(product_url)
-                    logger.debug(f"Extracted URL: '{product_url}' using attribute '{attribute}'")
+                    logger.debug(
+                        f"Extracted URL: '{product_url}' using attribute '{attribute}'")
                 else:
-                    logger.warning(f"No URL found for element using attribute '{attribute}'")
+                    logger.warning(
+                        f"No URL found for element using attribute '{attribute}'")
 
         except (StaleElementReferenceException, TimeoutException) as e:
             error_msg = (
@@ -852,7 +873,30 @@ class BaseParser:
             logger.error(error_msg, exc_info=True)
             raise UnableToGetNProductUrls(error_msg) from e
 
-        logger.debug(f"Retrieved {len(product_urls)} product URLs: {product_urls}")
+        logger.debug(
+            f"Retrieved {len(product_urls)} product URLs: {product_urls}")
+        return product_urls
+
+    def _get_product_urls(self, product: str, n: int) -> List[str]:
+        try:
+            logger.debug(f"Opening search results for '{product}'")
+            self._open_search_results(product)
+            logger.debug("Search results opened successfully")
+        except Exception as e:
+            logger.error(
+                f"Failed to open search results for '{product}'", exc_info=True)
+            raise
+
+        try:
+            logger.debug(f"Retrieving {n} product URLs")
+            product_urls = self._search_results_get_products_urls(n)
+            logger.debug(
+                f"Retrieved {len(product_urls)} product URLs: {product_urls}")
+        except Exception as e:
+            logger.error(
+                f"Failed to retrieve product URLs for '{product}'", exc_info=True)
+            raise
+
         return product_urls
 
     def _find_n_products(self, product: str, n: int, fast_parse: bool = True, ignore_price_format: bool = True,
@@ -879,22 +923,13 @@ class BaseParser:
             UnableToOpenSearchResultsException: If search results cannot be opened
             Exception: If product info parsing fails and raise_exception is True
         """
-
-        try:
-            logger.debug(f"Opening search results for '{product}'")
-            self._open_search_results(product)
-            logger.debug("Search results opened successfully")
-        except Exception as e:
-            logger.error(f"Failed to open search results for '{product}'", exc_info=True)
-            raise
-
-        try:
-            logger.debug(f"Retrieving {n} product URLs")
-            product_urls = self._search_results_get_products_urls(n)
-            logger.debug(f"Retrieved {len(product_urls)} product URLs: {product_urls}")
-        except Exception as e:
-            logger.error(f"Failed to retrieve product URLs for '{product}'", exc_info=True)
-            raise
+        for i in range(3):
+            product_urls = self._get_product_urls(product=product, n=n)
+            if len(product_urls) == 0:
+                warning_msg = f"No product URLs found for '{product}'"
+                logger.warning(warning_msg)
+            else:
+                break
 
         products = []
         for product_url in product_urls:
@@ -907,7 +942,7 @@ class BaseParser:
                     raise_exception=raise_exception
                 )
                 products.append(product_info)
-                logger.debug(f"Product info parsed: {product_info}")
+                logger.debug(f"Product info parsed")
             except Exception as e:
                 error_msg = f"Failed to parse product info for '{product_url}'"
                 logger.error(error_msg, exc_info=True)
@@ -920,11 +955,11 @@ class BaseParser:
             if raise_exception:
                 raise UnableToGetNProductUrls(warning_msg)
 
-        logger.debug(f"Returning {len(products)} products: {[str(p) for p in products]}")
+        logger.debug(f"Returning {len(products)} products")
         return products
 
     def find_n_products(self, product: str, n: int, fast_parse: bool = True, ignore_price_format: bool = True,
-                    raise_exception: bool = False) -> List[ProductInfo]:
+                        raise_exception: bool = False) -> List[ProductInfo]:
         """
         Abstract method to find and retrieve information on up to `n` products.
 
@@ -946,6 +981,6 @@ class BaseParser:
             NotImplementedError: Always raised in this base implementation, as it must be overridden
         """
         logger.debug(f"Called abstract method find_n_products with product='{product}', n={n}, "
-                    f"fast_parse={fast_parse}, ignore_price_format={ignore_price_format}, "
-                    f"raise_exception={raise_exception}")
+                     f"fast_parse={fast_parse}, ignore_price_format={ignore_price_format}, "
+                     f"raise_exception={raise_exception}")
         raise NotImplementedError("Subclasses must implement find_n_products")

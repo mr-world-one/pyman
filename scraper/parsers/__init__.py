@@ -10,7 +10,7 @@ for handler in logging.root.handlers[:]:
 
 LOG_FILE_PATH = "scraper.log"
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.ERROR,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         # logging.FileHandler(LOG_FILE_PATH),
