@@ -5,7 +5,22 @@ from functools import wraps
 from scraper.utils import MAX_ATTEMPTS, DELAY
 from selenium.common.exceptions import TimeoutException, StaleElementReferenceException
 
+for handler in logging.root.handlers[:]:
+    logging.root.removeHandler(handler)
+
+LOG_FILE_PATH = "scraper.log"
+logging.basicConfig(
+    level=logging.ERROR,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        # logging.FileHandler(LOG_FILE_PATH),
+        logging.StreamHandler()
+    ],
+    encoding='utf-8'
+)
+
 logger = logging.getLogger(__name__)
+
 
 def retry_on_timeout(max_attempts=MAX_ATTEMPTS, delay=DELAY):
     """
@@ -29,9 +44,11 @@ def retry_on_timeout(max_attempts=MAX_ATTEMPTS, delay=DELAY):
 
             while attempt <= max_attempts:
                 try:
-                    logger.debug(f"Attempt {attempt} of {max_attempts} for function {func.__name__}")
+                    logger.debug(
+                        f"Attempt {attempt} of {max_attempts} for function {func.__name__}")
                     result = func(*args, **kwargs)
-                    logger.debug(f"Successfully executed {func.__name__} on attempt {attempt}")
+                    logger.debug(
+                        f"Successfully executed {func.__name__} on attempt {attempt}")
                     return result
 
                 except TimeoutException as e:
@@ -47,16 +64,18 @@ def retry_on_timeout(max_attempts=MAX_ATTEMPTS, delay=DELAY):
                         )
                         logger.error(error_msg, exc_info=True)
                         raise Exception(error_msg) from last_exception
-                    
+
                     attempt += 1
                     logger.info(f"Waiting {delay} seconds before next attempt")
                     time.sleep(delay)
 
             if last_exception:
-                logger.critical(f"Unexpected loop termination for {func.__name__}")
+                logger.critical(
+                    f"Unexpected loop termination for {func.__name__}")
                 raise last_exception
         return wrapper
     return decorator
+
 
 def retry_on_stale_element(max_attempts=MAX_ATTEMPTS, delay=DELAY):
     """
@@ -80,9 +99,11 @@ def retry_on_stale_element(max_attempts=MAX_ATTEMPTS, delay=DELAY):
 
             while attempt <= max_attempts:
                 try:
-                    logger.debug(f"Attempt {attempt} of {max_attempts} for function {func.__name__}")
+                    logger.debug(
+                        f"Attempt {attempt} of {max_attempts} for function {func.__name__}")
                     result = func(*args, **kwargs)
-                    logger.debug(f"Successfully executed {func.__name__} on attempt {attempt}")
+                    logger.debug(
+                        f"Successfully executed {func.__name__} on attempt {attempt}")
                     return result
 
                 except StaleElementReferenceException as e:
@@ -98,16 +119,18 @@ def retry_on_stale_element(max_attempts=MAX_ATTEMPTS, delay=DELAY):
                         )
                         logger.error(error_msg, exc_info=True)
                         raise Exception(error_msg) from last_exception
-                    
+
                     attempt += 1
                     logger.info(f"Waiting {delay} seconds before next attempt")
                     time.sleep(delay)
 
             if last_exception:
-                logger.critical(f"Unexpected loop termination for {func.__name__}")
+                logger.critical(
+                    f"Unexpected loop termination for {func.__name__}")
                 raise last_exception
         return wrapper
     return decorator
+
 
 class ProductInfo:
     def __init__(self, url, price, is_on_sale, price_on_sale, is_available, title):
@@ -130,7 +153,8 @@ class ProductInfo:
 
     def __str__(self):
         return str(self.to_dict())
-    
+
+
 class Website:
     def __init__(self, url: str, price_format: str, product_xpaths: 'ProductXpaths', website_navigation: 'NavigationXPaths'):
         self.url = url
@@ -141,6 +165,7 @@ class Website:
     def __str__(self):
         return f'{self.url}'
 
+
 class ProductXpaths:
     def __init__(self, price_on_sale, price_without_sale, price, availability, title, available_text):
         self.PRICE_ON_SALE = price_on_sale
@@ -149,6 +174,7 @@ class ProductXpaths:
         self.AVAILABILITY = availability
         self.TITLE = title
         self.AVAILABLE_TEXT = available_text
+
 
 class NavigationXPaths:
     def __init__(self, search_field: str, submit_button: str, search_result_products_xpath_templates: str, search_result_link_attribute: str):

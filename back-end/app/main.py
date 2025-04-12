@@ -232,7 +232,7 @@ def parse_excel_file(file_content: bytes):
                     'original_quantity': int(quantity),
                     'original_price_uah': float(price),
                     'original_total_uah': float(total),
-                    'rozetka_results': []
+                    'rozetka_results': []  # Залишаємо для сумісності, але не використовуємо тут
                 }
                 data.append(row_data)
             except (ValueError, TypeError) as e:
@@ -249,99 +249,37 @@ def parse_excel_file(file_content: bytes):
 
 @app.post("/excel-page")
 async def upload_excel(file: UploadFile = File(...)):
+    rozetka = RozetkaParser()
     try:
         file_content = await file.read()
-        data = parse_excel_file(file_content)
-        rozetka = RozetkaParser()
-        # Проходимо по кожному рядку і шукаємо продукти
-        for row in data:
+        excel_data = parse_excel_file(file_content)  # Зберігаємо дані з Excel
+        
+        d = []  # Результати з Rozetka
+        
+        for row in excel_data:
             product_name = row['product_name']
-            if not product_name or not isinstance(product_name, str):
-                logger.warning(f"Invalid product name in row: {row}")
-                continue
-                
             logger.info(f"Searching for: '{product_name}'")
-            
             try:
-                # Скидаємо будь-який внутрішній стан парсера, якщо це можливо
-                if hasattr(rozetka, 'clear_cache'):
-                    rozetka.clear_cache()
-                
-                # Виконуємо пошук для поточного товару
                 rozetka_data = rozetka.find_n_products(
-                    product=product_name.strip(),  # Видаляємо пробіли
-                    n=2,
+                    product=product_name,
+                    n=1,
                     fast_parse=False,
                     ignore_price_format=True,
                     raise_exception=False
                 )
-                
-                if not rozetka_data:
-                    logger.warning(f"No products found for '{product_name}'")
-                else:
-                    for item in rozetka_data:
-                        item_dict = item.__dict__ if hasattr(item, '__dict__') else dict(item)
-                        # Перевіряємо, чи результат відповідає запиту
-                        if product_name.lower() not in item_dict.get('title', '').lower():
-                            logger.warning(f"Result '{item_dict.get('title', '')}' does not match '{product_name}'")
-                            continue
-                        row['rozetka_results'].append(item_dict)
-                    logger.info(f"Found {len(row['rozetka_results'])} relevant products for '{product_name}'")
-                    
+                d.extend(rozetka_data)
+                logger.info(f"Success: Found {len(rozetka_data)} products for '{product_name}'")
             except Exception as e:
-                logger.error(f"Error searching for '{product_name}': {str(e)}")
+                logger.warning(f"No result for '{product_name}': {str(e)}")
                 continue
         
-        has_results = any(row['rozetka_results'] for row in data)
-        if not has_results:
-            logger.warning("No products found for any item")
-            return {"status": "warning", "message": "No products found for any item", "data": data}
-            
+        # Повертаємо обидва набори даних
         return {
             "status": "success",
             "message": "Products found",
-            "data": data
+            "excel_data": excel_data,  # Дані з Excel
+            "rozetka_data": d          # Дані з Rozetka
         }
-        
-    except ValueError as ve:
-        logger.error(f"ValueError in upload_excel: {str(ve)}")
-        return {"status": "error", "message": str(ve), "data": []}
     except Exception as e:
         logger.error(f"Error in upload_excel: {str(e)}")
-        return {"status": "error", "message": f"Unexpected error: {str(e)}", "data": []}
-
-# @app.post("/excel-page")
-# async def upload_excel(file: UploadFile = File(...)):
-#     try:
-#         file_content = await file.read()
-#         data = parse_excel_file(file_content)
-
-        
-#         d = []
-        
-#         for row in data:
-#             product_name = row['product_name']
-#             logger.info(f"Searching for: '{product_name}'")
-
-#             try:
-#                 rozetka_data = rozetka.find_n_products(
-#                     product=product_name,
-#                     n=2,
-#                     fast_parse=False,
-#                     ignore_price_format=True,
-#                     raise_exception=False
-#                 )
-#                 d.append(rozetka_data)
-#                 print("success" + str(e))
-#             except Exception as e:
-#                 print("No result" + str(e))
-#                 continue
-
-#     except Exception as e:
-#         return str(e)
-
-#     return {
-#         "status": "success",
-#         "message": "Products found",
-#         "data": d
-#     }
+        return str(e)
