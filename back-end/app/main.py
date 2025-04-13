@@ -265,7 +265,7 @@ async def upload_excel(file: UploadFile = File(...)):
                     n=1,
                     fast_parse=False,
                     ignore_price_format=True,
-                    raise_exception=False
+                    raise_exception=True
                 )
                 d.extend(rozetka_data)
                 logger.info(f"Success: Found {len(rozetka_data)} products for '{product_name}'")
