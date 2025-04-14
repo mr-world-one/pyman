@@ -24,6 +24,9 @@ from selenium.webdriver.chrome.options import Options
 from urllib.parse import quote
 import time
 import re
+from app.routers.ai_assistant import router as assistant_router
+
+
 
 
 # Local imports
@@ -99,6 +102,7 @@ async def startup():
             detail=f"Application startup failed: {str(e)}"
         )
 
+app.include_router(assistant_router)
 # Include routers with authentication
 app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
 app.include_router(
