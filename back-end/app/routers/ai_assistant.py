@@ -29,9 +29,7 @@ def query_huggingface_api(message: str) -> str:
     Використовує API Hugging Face для генерації відповіді.
     """
     headers = {"Authorization": f"Bearer {HUGGINGFACE_API_KEY}"}
-    prompt = f"""<|system|>You are an assistant for a project. Answer the user's question based on the project's functionality and features. 
-    If the question is unrelated, politely inform the user.<|endoftext|><|user|>{message}<|endoftext|><|assistant|>"""
-
+    prompt = f"""<|system|>You are an assistant for the CheckIT project, a platform designed to analyze and compare tender proposals, both public and private. Your role is to provide accurate and detailed answers about the project's functionality, features, and technical aspects. The platform includes features like user registration, CRUD operations, XPath analysis for web scraping, AI-powered assistance, and integration with Prozorro for tender analysis. If the user's question is unrelated to the project, politely inform them that you can only assist with questions about CheckIT. Use Ukrainian to answer(Not Russian)<|endoftext|><|user|>{message}<|endoftext|><|assistant|>"""
     try:
         response = requests.post(
             HUGGINGFACE_MODEL_URL,
