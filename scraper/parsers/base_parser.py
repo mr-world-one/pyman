@@ -495,7 +495,7 @@ class BaseParser:
         return self.normalize_price(price_element.text, ignore_price_format=ignore_price_format)
 
     @retry_on_timeout()
-    def open_page(self, url: str) -> None:
+    def open_page(self, url: str, force_reload: bool = False) -> None:
         """
         Navigate to a specified URL using the WebDriver, with timeout retry support.
 
@@ -504,6 +504,7 @@ class BaseParser:
 
         Args:
             url (str): URL to open in the WebDriver
+            force_reload (bool): Flag that forces reloading of page
 
         Returns:
             None
@@ -524,7 +525,7 @@ class BaseParser:
         # Navigate to URL if different from current
         try:
             current_url = self.driver.current_url
-            if current_url != url:
+            if force_reload or current_url != url:
                 logger.debug(f"Navigating from '{current_url}' to '{url}'")
                 self.driver.get(url)
                 # Wait for page to be fully loaded
@@ -616,7 +617,7 @@ class BaseParser:
         logger.debug(f"Gathering product info for URL: '{url}', fast_parse={fast_parse}, "
                      f"ignore_price_format={ignore_price_format}, raise_exception={raise_exception}")
 
-        self.open_page(url)
+        self.open_page(url, force_reload=True)
 
         price = None
         is_on_sale = None

@@ -15,6 +15,15 @@ from statistics import mean
 import logging
 from io import BytesIO
 from openpyxl import load_workbook
+from pydantic import BaseModel
+from typing import List, Optional
+from .prozorro_functionality.prozorro import get_contract_info
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+from urllib.parse import quote
+import time
+import re
 
 
 # Local imports
@@ -142,67 +151,6 @@ async def test_db_connection():
             detail=f"Database connection failed: {str(e)}"
         )
 
-# @app.post("/excel-page")
-# async def upload_excel(string):#(file: UploadFile = File(...)):
-#     # # Читання Excel
-#     # df = pd.read_excel(file.file, skiprows=1)  # Пропускаємо перший рядок (заголовки без назв)
-#     # df.columns = ["Номер", "Назва товару", "Кількість", "Ціна, грн", "Сума, грн"]  # Встановлюємо правильні назви колонок
-#     # df = df.dropna(subset=["Назва товару"])  # Видаляємо рядки без назв (наприклад, підсумок)
-
-#     # products = df["Назва товару"].tolist()  # Список назв товарів
-#     # excel_prices = df["Ціна, грн"].tolist()  # Список цін із тендеру
-
-#     product = "Iphone 16"
-
-#     # Ініціалізація парсера Rozetka
-#     rozetka = RozetkaParser()
-#     comp = rozetka.find_n_products(product)
-
-#     # Збір даних і порівняння
-#     # comparison = []
-#     # for product, excel_price in zip(products, excel_prices):
-#     #     # Парсимо 5 товарів із Rozetka
-#     #     rozetka_data = rozetka.find_n_products(
-#     #         product=product,
-#     #         n = 2,  # Шукаємо 2 товарів
-#     #         fast_parse=True,  # Тільки price і title
-#     #         ignore_price_format=True,  # Повертаємо рядок, якщо не float
-#     #         raise_exception=False  # Пропускаємо помилки
-#     #     )
-
-#     #     # Вибираємо найнижчу ціну
-#     #     prices = [item.price for item in rozetka_data if item.price is not None]
-#     #     rozetka_price = min(prices, default=None) if prices else None
-#     #     rozetka_title = rozetka_data[0].title if rozetka_data else product  # Беремо першу назву або з Excel
-
-#     #     comparison.append({
-#     #         "name": rozetka_title,
-#     #         "excelPrice": excel_price,
-#     #         "rozetkaPrice": rozetka_price
-#     #     })
-#     return comp
-
-
-# rozetka = RozetkaParser()
-# @app.get("/excel-page")
-# async def upload_excel():
-#     try:
-#         product = "iphone"
-#         rozetka_data = rozetka.find_n_products(
-#             product=product,
-#             n=2,
-#             fast_parse=False,
-#             ignore_price_format=True,
-#             raise_exception=False
-#         )
-#         if not rozetka_data:
-#             logger.warning("No products found")
-#             return {"status": "warning", "message": "No products found", "data": []}
-#         return {"status": "success", "message": "Products found", "data": rozetka_data}
-#     except Exception as e:
-#         logger.error(f"Error in upload_excel: {str(e)}")
-#         return {"status": "error", "message": str(e), "data": []}
-
 def parse_excel_file(file_content: bytes):
     try:
         workbook = load_workbook(filename=BytesIO(file_content))
@@ -265,7 +213,7 @@ async def upload_excel(file: UploadFile = File(...)):
                     n=1,
                     fast_parse=False,
                     ignore_price_format=True,
-                    raise_exception=False
+                    raise_exception=True
                 )
                 d.extend(rozetka_data)
                 logger.info(f"Success: Found {len(rozetka_data)} products for '{product_name}'")
@@ -283,3 +231,39 @@ async def upload_excel(file: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"Error in upload_excel: {str(e)}")
         return str(e)
+
+# @app.post("/search-tender")
+# async def prozorro_data(contract_id : str):
+#     rozetka = RozetkaParser()
+#     try:
+#         pr_data = get_contract_info(contract_id)
+#         d = [] 
+        
+#         for row in pr_data:
+#             product_name = row['name']
+#             logger.info(f"Searching for: '{product_name}'")
+#             try:
+#                 rozetka_data = rozetka.find_n_products(
+#                     product=product_name,
+#                     n=1,
+#                     fast_parse=False,
+#                     ignore_price_format=True,
+#                     raise_exception=False
+#                 )
+#                 d.extend(rozetka_data)
+#                 logger.info(f"Success: Found {len(rozetka_data)} products for '{product_name}'")
+#             except Exception as e:
+#                 logger.warning(f"No result for '{product_name}': {str(e)}")
+#                 continue
+        
+#         # Повертаємо обидва набори даних
+#         return {
+#             "status": "success",
+#             "message": "Products found",
+#             "excel_data": pr_data,  # Дані з Excel
+#             "rozetka_data": d          # Дані з Rozetka
+#         }
+#     except Exception as e:
+#         logger.error(f"Error in upload_excel: {str(e)}")
+#         return str(e)
+

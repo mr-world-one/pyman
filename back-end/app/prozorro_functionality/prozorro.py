@@ -222,4 +222,4 @@ def get_contract_info(contract_id):
 
     return items
 
-#print(get_contract_info("33f405c1a83b4e3b9835e546cb8db51f"))
+# print(get_contract_info("33f405c1a83b4e3b9835e546cb8db51f"))
