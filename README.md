@@ -1,4 +1,4 @@
-# my-project
+# Pyman-project
 
 ## Project setup
 ```
