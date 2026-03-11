@@ -11,12 +11,13 @@ class Database:
     def __init__(self):
         self.connection = None
         try:
+            # Use unified DB env vars (fallback to legacy scraper vars)
             self.connection = psycopg2.connect(
-                database=os.getenv("DB_NAME"),
-                user=os.getenv("DB_USER"),
-                password=os.getenv("DB_PASSWORD"),
-                host=os.getenv("DB_HOST"),
-                port=os.getenv("DB_PORT")
+                database=os.getenv("DB_NAME", os.getenv("POSTGRES_DB", "check_it")),
+                user=os.getenv("DB_USER", os.getenv("POSTGRES_USER", "postgres")),
+                password=os.getenv("DB_PASSWORD", os.getenv("POSTGRES_PASSWORD", "")),
+                host=os.getenv("DB_HOST", os.getenv("POSTGRES_HOST", "localhost")),
+                port=os.getenv("DB_PORT", os.getenv("POSTGRES_PORT", "5432")),
             )
         except Error as e:
             print(f"Помилка при підключенні: {e}")

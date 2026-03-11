@@ -8,7 +8,18 @@
         <p v-else>Вибраний файл: {{ fileName }}</p>
       </div>
       <input type="file" ref="fileInput" @change="handleFileChange" accept=".xlsx, .xls" hidden />
-      <button v-if="fileName" @click="handleUpload">Завантажити та перевірити</button>
+
+      <div class="store-selector" v-if="fileName">
+        <label>Оберіть магазини для порівняння:</label>
+        <div class="store-checkboxes">
+          <label v-for="store in availableStores" :key="store.key" class="store-checkbox">
+            <input type="checkbox" :value="store.key" v-model="selectedStores" />
+            {{ store.name }}
+          </label>
+        </div>
+      </div>
+
+      <button v-if="fileName" @click="handleUpload" :disabled="selectedStores.length === 0">Завантажити та перевірити</button>
       <div v-if="comparisonData" class="results-container">
         <h2>Результати порівняння</h2>
         <table class="modern-table">
@@ -16,7 +27,8 @@
             <tr>
               <th>Назва товару</th>
               <th>Ціна з тендеру</th>
-              <th>Ціна з Rozetka</th>
+              <th>Ціна з магазину</th>
+              <th>Магазин</th>
               <th>Різниця</th>
             </tr>
           </thead>
@@ -24,7 +36,8 @@
             <tr v-for="item in comparisonData" :key="item.product_name" class="table-row">
               <td>{{ item.product_name }}</td>
               <td>{{ item.original_price_uah.toFixed(2) }} грн</td>
-              <td>{{ getLowestRozetkaPrice(item.product_name) || 'Н/Д' }} {{ getLowestRozetkaPrice(item.product_name) ? 'грн' : '' }}</td>
+              <td>{{ getLowestStorePrice(item.product_name)?.price || 'Н/Д' }} {{ getLowestStorePrice(item.product_name) ? 'грн' : '' }}</td>
+              <td>{{ getLowestStorePrice(item.product_name)?.store_name || '—' }}</td>
               <td :class="getDifferenceClass(item)">
                 {{ getPriceDifference(item) }}
               </td>
@@ -63,7 +76,7 @@
 
 <script>
   import { ref } from 'vue';
-  import axios from 'axios';
+  import { apiClient } from '@/api/config';
 
   export default {
     name: 'ExcelUpload',
@@ -72,8 +85,15 @@
       const fileData = ref(null);
       const fileInput = ref(null);
       const comparisonData = ref(null);
-      const rozetkaData = ref(null);
+      const storeData = ref(null);
       const isLoading = ref(false);
+      const availableStores = ref([
+        { key: 'rozetka', name: 'Rozetka' },
+        { key: 'silpo', name: 'Сільпо' },
+        { key: 'epicentr', name: 'Епіцентр' },
+        { key: 'citadel', name: 'Citadel' },
+      ]);
+      const selectedStores = ref(['rozetka']);
 
       const triggerFileInput = () => {
         fileInput.value.click();
@@ -105,7 +125,8 @@
         isLoading.value = true;
 
         try {
-          const response = await axios.post('http://localhost:8000/excel-page', formData, {
+          const storesParam = selectedStores.value.join(',');
+          const response = await apiClient.post(`/excel-page?stores=${storesParam}`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
           });
 
@@ -115,71 +136,63 @@
           }
 
           comparisonData.value = response.data.excel_data;
-          rozetkaData.value = response.data.rozetka_data;
+          storeData.value = response.data.store_data;
           fileName.value = '';
           fileData.value = null;
         } catch (error) {
           console.error('Помилка:', error);
-          alert('Сталася помилка під час обробки файлу');
+          alert(error.response?.data?.detail || 'Сталася помилка під час обробки файлу');
         } finally {
           isLoading.value = false;
         }
       };
 
-      // Функція для оцінки подібності двох рядків (імітація LIKE)
       const areNamesSimilar = (name1, name2) => {
-        // Очищаємо і приводимо до нижнього регістру
-        const cleanName1 = name1.trim().toLowerCase().replace(/[^a-z0-9\s]/g, '');
-        const cleanName2 = name2.trim().toLowerCase().replace(/[^a-z0-9\s]/g, '');
-
-        // Розбиваємо на слова
+        const cleanName1 = name1.trim().toLowerCase().replace(/[^a-zа-яїієґ0-9\s]/g, '');
+        const cleanName2 = name2.trim().toLowerCase().replace(/[^a-zа-яїієґ0-9\s]/g, '');
         const words1 = cleanName1.split(/\s+/).filter(word => word.length > 1);
         const words2 = cleanName2.split(/\s+/).filter(word => word.length > 1);
-
-        // Якщо назви дуже короткі, перевіряємо точний збіг
         if (cleanName1.length < 3 || cleanName2.length < 3) {
           return cleanName1.includes(cleanName2) || cleanName2.includes(cleanName1);
         }
-
-        // Знаходимо спільні слова
         const commonWords = words1.filter(word => words2.some(w => w.includes(word) || word.includes(w)));
-
-        // Обчислюємо відсоток збігу
         const similarity = commonWords.length / Math.max(words1.length, words2.length, 1);
-
-        // Вважаємо назви схожими, якщо є хоча б 30% збігу слів
         return similarity >= 0.15;
       };
 
-      const getLowestRozetkaPrice = (productName) => {
-        if (!rozetkaData.value || rozetkaData.value.length === 0) return null;
+      const getLowestStorePrice = (productName) => {
+        if (!storeData.value || storeData.value.length === 0) return null;
 
-        const matchingItems = rozetkaData.value.filter(item =>
+        const matchingItems = storeData.value.filter(item =>
           areNamesSimilar(productName, item.title)
         );
 
-        if (matchingItems.length === 0) {
-          console.log(`No matching items for "${productName}"`);
-          return null;
-        }
+        if (matchingItems.length === 0) return null;
 
-        return Math.min(
-          ...matchingItems.map(item => item.price_on_sale || item.price)
-        ).toFixed(2);
+        const best = matchingItems.reduce((min, item) => {
+          const price = item.price_on_sale || item.price;
+          const minPrice = min.price_on_sale || min.price;
+          return (price < minPrice) ? item : min;
+        });
+
+        return {
+          price: (best.price_on_sale || best.price)?.toFixed?.(2) || best.price_on_sale || best.price,
+          store_name: best.store_name || '—',
+        };
       };
 
       const getPriceDifference = (item) => {
         const tenderPrice = parseFloat(item.original_price_uah);
-        const rozetkaPrice = getLowestRozetkaPrice(item.product_name);
-        if (!rozetkaPrice) return '—';
-        const diff = tenderPrice - parseFloat(rozetkaPrice);
+        const storeInfo = getLowestStorePrice(item.product_name);
+        if (!storeInfo) return '—';
+        const diff = tenderPrice - parseFloat(storeInfo.price);
         return diff >= 0 ? `+${diff.toFixed(2)} грн` : `${diff.toFixed(2)} грн`;
       };
 
       const getDifferenceClass = (item) => {
-        const rozetkaPrice = getLowestRozetkaPrice(item.product_name);
-        if (!rozetkaPrice) return '';
-        const diff = parseFloat(item.original_price_uah) - parseFloat(rozetkaPrice);
+        const storeInfo = getLowestStorePrice(item.product_name);
+        if (!storeInfo) return '';
+        const diff = parseFloat(item.original_price_uah) - parseFloat(storeInfo.price);
         return diff > 0 ? 'price-higher' : diff < 0 ? 'price-lower' : 'price-equal';
       };
 
@@ -188,13 +201,15 @@
         fileData,
         fileInput,
         comparisonData,
-        rozetkaData,
+        storeData,
         isLoading,
+        availableStores,
+        selectedStores,
         triggerFileInput,
         handleFileChange,
         handleDrop,
         handleUpload,
-        getLowestRozetkaPrice,
+        getLowestStorePrice,
         getPriceDifference,
         getDifferenceClass
       };
@@ -247,6 +262,46 @@
 
     .drop-area:hover {
       background-color: rgba(0, 255, 0, 0.1);
+    }
+
+  .store-selector {
+    margin: 1.5rem 0;
+    text-align: left;
+  }
+
+    .store-selector label {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #333;
+    }
+
+  .store-checkboxes {
+    display: flex;
+    gap: 1.2rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+    justify-content: center;
+  }
+
+  .store-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 500 !important;
+    cursor: pointer;
+    padding: 0.4rem 0.8rem;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    transition: background 0.2s;
+  }
+
+    .store-checkbox:hover {
+      background: rgba(14, 252, 61, 0.1);
+    }
+
+    .store-checkbox input[type='checkbox'] {
+      width: auto;
+      margin: 0;
     }
 
   button {

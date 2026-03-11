@@ -1,3 +1,4 @@
+import os
 import re
 
 from selenium import webdriver
@@ -62,8 +63,14 @@ class BaseParser:
             logger.debug(f"Added experimental options: {SELENIUM_EXPERIMENTAL_OPTIONS}")
 
             logger.info("Initializing Chrome WebDriver")
+            # Use system chromedriver in Docker, otherwise use webdriver-manager
+            chromedriver_path = os.environ.get("CHROMEDRIVER_PATH")
+            if chromedriver_path and os.path.isfile(chromedriver_path):
+                service = Service(chromedriver_path)
+            else:
+                service = Service(ChromeDriverManager().install())
             self.driver = webdriver.Chrome(
-                service=Service(ChromeDriverManager().install()),
+                service=service,
                 options=self.options
             )
             self.driver.implicitly_wait(IMPLICIT_TIMEOUT)

@@ -8,7 +8,18 @@
                v-model.trim="tenderId"
                placeholder="Введіть ID тендеру (наприклад, UA-2023-01-01-000001-a)"
                required />
-        <button type="submit" :disabled="isLoading">Аналізувати</button>
+
+        <div class="store-selector">
+          <label>Оберіть магазини для порівняння:</label>
+          <div class="store-checkboxes">
+            <label v-for="store in availableStores" :key="store.key" class="store-checkbox">
+              <input type="checkbox" :value="store.key" v-model="selectedStores" />
+              {{ store.name }}
+            </label>
+          </div>
+        </div>
+
+        <button type="submit" :disabled="isLoading || selectedStores.length === 0">Аналізувати</button>
       </form>
       <div v-if="isLoading" class="loading-overlay">
         <div aria-busy="true" aria-label="Loading" role="progressbar" class="loading-container">
@@ -43,18 +54,20 @@
             <tr>
               <th>Назва товару</th>
               <th>Ціна з тендеру</th>
-              <th>Ціна з Rozetka</th>
+              <th>Ціна з магазину</th>
+              <th>Магазин</th>
               <th>Різниця</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="item in analytics" :key="item.name" class="table-row">
+            <tr v-for="item in analytics" :key="item.name + item.store" class="table-row">
               <td>
-                <a :href="item.rozetka_url" target="_blank" v-if="item.rozetka_url">{{ item.name }}</a>
+                <a :href="item.store_url" target="_blank" v-if="item.store_url">{{ item.name }}</a>
                 <span v-else>{{ item.name }}</span>
               </td>
               <td>{{ item.tender_price.toFixed(2) }} грн</td>
-              <td>{{ item.rozetka_price ? item.rozetka_price.toFixed(2) + ' грн' : 'Н/Д' }}</td>
+              <td>{{ item.store_price ? item.store_price.toFixed(2) + ' грн' : 'Н/Д' }}</td>
+              <td>{{ item.store_name || '—' }}</td>
               <td :class="getDifferenceClass(item)">
                 {{ getPriceDifference(item) }}
               </td>
@@ -70,7 +83,7 @@
 </template>
 
 <script>
-  import axios from 'axios';
+  import { apiClient } from '@/api/config';
 
   export default {
     name: 'Prozorro',
@@ -80,6 +93,13 @@
         analytics: null,
         isLoading: false,
         error: null,
+        availableStores: [
+          { key: 'rozetka', name: 'Rozetka' },
+          { key: 'silpo', name: 'Сільпо' },
+          { key: 'epicentr', name: 'Епіцентр' },
+          { key: 'citadel', name: 'Citadel' },
+        ],
+        selectedStores: ['rozetka'],
       };
     },
     methods: {
@@ -89,42 +109,48 @@
         this.analytics = null;
 
         try {
-          //// GET-запит до /contract_info/{contract_id}
-          //const contractResponse = await axios.get(`http://localhost:8000/contract_info/${this.tenderId}`);
-          //const tenderData = contractResponse.data;
-
-          // POST-запит до /search-tender
-          const searchResponse = await axios.get(`http://localhost:8000/search-tender/${this.tenderId}`
+          const storesParam = this.selectedStores.join(',');
+          const searchResponse = await apiClient.get(
+            `/search-tender/${this.tenderId}`,
+            { params: { stores: storesParam } }
           );
 
-          this.analytics = this.processAnalytics(searchResponse.data.prozorro_data, searchResponse.data.rozetka_data);
+          this.analytics = this.processAnalytics(
+            searchResponse.data.prozorro_data,
+            searchResponse.data.store_data
+          );
         } catch (error) {
           this.error = error.response?.data?.detail || error.message || 'Помилка сервера';
         } finally {
           this.isLoading = false;
         }
       },
-      processAnalytics(prozorroData, rozetkaData) {
+      processAnalytics(prozorroData, storeData) {
         return prozorroData.map((tenderItem) => {
           const name = tenderItem.name || '';
           const tenderPrice = parseFloat(tenderItem.unit_price) || 0;
 
-          // Зіставляємо з rozetka_data
-          const rozetkaItem = rozetkaData.find((item) => this.areNamesSimilar(name, item.title)) || {};
+          // Find best match from store data
+          const matchingItem = storeData.find((item) => this.areNamesSimilar(name, item.title)) || {};
+
+          const storePrice = matchingItem.price_on_sale
+            ? parseFloat(matchingItem.price_on_sale)
+            : parseFloat(matchingItem.price) || null;
 
           return {
             name,
             tender_price: tenderPrice,
-            rozetka_price: rozetkaItem.price_on_sale ? parseFloat(rozetkaItem.price_on_sale) : parseFloat(rozetkaItem.price) || null,
-            rozetka_url: rozetkaItem.url || null,
-            price_difference: rozetkaItem.price_on_sale || rozetkaItem.price ? tenderPrice - parseFloat(rozetkaItem.price_on_sale || rozetkaItem.price) : null,
+            store_price: storePrice,
+            store_url: matchingItem.url || null,
+            store_name: matchingItem.store_name || null,
+            price_difference: storePrice ? tenderPrice - storePrice : null,
           };
         }).filter((item) => item.name && item.tender_price);
       },
       areNamesSimilar(name1, name2) {
         if (!name1 || !name2) return false;
-        const cleanName1 = name1.trim().toLowerCase().replace(/[^a-z0-9\s]/g, '');
-        const cleanName2 = name2.trim().toLowerCase().replace(/[^a-z0-9\s]/g, '');
+        const cleanName1 = name1.trim().toLowerCase().replace(/[^a-zа-яїієґ0-9\s]/g, '');
+        const cleanName2 = name2.trim().toLowerCase().replace(/[^a-zа-яїієґ0-9\s]/g, '');
         const words1 = cleanName1.split(/\s+/).filter((word) => word.length > 1);
         const words2 = cleanName2.split(/\s+/).filter((word) => word.length > 1);
         if (cleanName1.length < 3 || cleanName2.length < 3) {
@@ -135,12 +161,12 @@
         return similarity >= 0.15;
       },
       getPriceDifference(item) {
-        if (!item.rozetka_price) return '—';
+        if (!item.store_price) return '—';
         const diff = item.price_difference;
         return diff >= 0 ? `+${diff.toFixed(2)} грн` : `${diff.toFixed(2)} грн`;
       },
       getDifferenceClass(item) {
-        if (!item.rozetka_price) return '';
+        if (!item.store_price) return '';
         const diff = item.price_difference;
         return diff > 0 ? 'price-higher' : diff < 0 ? 'price-lower' : 'price-equal';
       },
@@ -308,6 +334,46 @@
     padding: 6px 10px;
     border-radius: 6px;
   }
+
+  .store-selector {
+    margin: 1.5rem 0;
+    text-align: left;
+  }
+
+    .store-selector label {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #333;
+    }
+
+  .store-checkboxes {
+    display: flex;
+    gap: 1.2rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+    justify-content: center;
+  }
+
+  .store-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 500 !important;
+    cursor: pointer;
+    padding: 0.4rem 0.8rem;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    transition: background 0.2s;
+  }
+
+    .store-checkbox:hover {
+      background: rgba(14, 252, 61, 0.1);
+    }
+
+    .store-checkbox input[type='checkbox'] {
+      width: auto;
+      margin: 0;
+    }
 
   .error-message {
     color: #e63946;

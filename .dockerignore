@@ -1,0 +1,10 @@
+**/__pycache__
+**/*.pyc
+**/.env
+.git
+.gitignore
+*.md
+back-end/app/prozorro_functionality/temp_pdf/*
+front-project/node_modules
+front-project/dist
+postgres_data

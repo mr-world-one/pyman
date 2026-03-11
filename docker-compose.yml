@@ -1,0 +1,64 @@
+version: "3.8"
+
+services:
+  # ─── PostgreSQL Database ───────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-check_it}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Initialise scraper tables on first run
+      - ./scraper/sql/init_db.sql:/docker-entrypoint-initdb.d/01-init-scraper.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─── FastAPI Backend + Scraper ────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: back-end/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Database (async driver for SQLAlchemy)
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-check_it}
+      # Scraper DB (sync psycopg2 — same unified DB)
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-check_it}
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      # JWT
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      # Selenium / Chrome
+      CHROME_BIN: /usr/bin/chromium
+      CHROMEDRIVER_PATH: /usr/bin/chromedriver
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./back-end/app/prozorro_functionality/temp_pdf:/app/back-end/app/prozorro_functionality/temp_pdf
+
+  # ─── Vue 3 Frontend (nginx) ──────────────────────────────
+  frontend:
+    build:
+      context: ./front-project
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+volumes:
+  postgres_data:

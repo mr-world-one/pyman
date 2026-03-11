@@ -6,7 +6,8 @@ SELENIUM_OPTIONS = [
     '--headless',
     '--disable-gpu',
     '--incognito',
-
+    '--no-sandbox',
+    '--disable-dev-shm-usage',
 ]
 
 SELENIUM_EXPERIMENTAL_OPTIONS = {

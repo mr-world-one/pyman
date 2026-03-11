@@ -94,6 +94,7 @@
 
 <script>
   import { ref } from 'vue'
+  import { apiClient } from '@/api/config'
 
   export default {
     name: 'Xpath',
@@ -113,23 +114,18 @@
 
       const handleAdd = async () => {
         try {
-          const response = await fetch('http://localhost:8000/stores', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: formData.value.name,
-              url: formData.value.url,
-              title_xpath: formData.value.title_xpath,
-              available_xpath: formData.value.available_xpath,
-              price_xpath: formData.value.price_xpath,
-              price_without_sale_xpath: formData.value.price_without_sale_xpath,
-              price_on_sale_xpath: formData.value.price_on_sale_xpath
-            })
+          const response = await apiClient.post('/xpath/store/', {
+            name: formData.value.name,
+            url: formData.value.url,
+            title_xpath: formData.value.title_xpath,
+            available_xpath: formData.value.available_xpath,
+            price_xpath: formData.value.price_xpath,
+            price_without_sale_xpath: formData.value.price_without_sale_xpath,
+            price_on_sale_xpath: formData.value.price_on_sale_xpath
           })
-          const result = await response.json()
-          console.log("Додавання X-Path:", result)
-          alert(`Додано X-Path:\n${JSON.stringify(result, null, 2)}`)
-          formData.value = { ...formData.value, name: '', url: '', title_xpath: '', available_xpath: '', price_xpath: '', price_without_sale_xpath: '', price_on_sale_xpath: '' }
+          console.log("Додавання X-Path:", response.data)
+          alert(`Додано X-Path:\n${JSON.stringify(response.data, null, 2)}`)
+          formData.value = { name: '', url: '', title_xpath: '', available_xpath: '', price_xpath: '', price_without_sale_xpath: '', price_on_sale_xpath: '' }
         } catch (error) {
           console.error("Помилка додавання:", error)
           alert('Помилка при додаванні X-Path')
@@ -138,22 +134,17 @@
 
       const handleEdit = async () => {
         try {
-          const response = await fetch(`http://localhost:8000/stores/${formData.value.name}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              url: formData.value.url || undefined,
-              title_xpath: formData.value.title_xpath || undefined,
-              available_xpath: formData.value.available_xpath || undefined,
-              price_xpath: formData.value.price_xpath || undefined,
-              price_without_sale_xpath: formData.value.price_without_sale_xpath || undefined,
-              price_on_sale_xpath: formData.value.price_on_sale_xpath || undefined
-            })
+          const response = await apiClient.put(`/xpath/store/${formData.value.name}`, {
+            url: formData.value.url || undefined,
+            title_xpath: formData.value.title_xpath || undefined,
+            available_xpath: formData.value.available_xpath || undefined,
+            price_xpath: formData.value.price_xpath || undefined,
+            price_without_sale_xpath: formData.value.price_without_sale_xpath || undefined,
+            price_on_sale_xpath: formData.value.price_on_sale_xpath || undefined
           })
-          const result = await response.json()
-          console.log("Редагування X-Path:", result)
+          console.log("Редагування X-Path:", response.data)
           alert(`Редаговано X-Path для магазину: ${formData.value.name}`)
-          formData.value = { ...formData.value, name: '', url: '', title_xpath: '', available_xpath: '', price_xpath: '', price_without_sale_xpath: '', price_on_sale_xpath: '' }
+          formData.value = { name: '', url: '', title_xpath: '', available_xpath: '', price_xpath: '', price_without_sale_xpath: '', price_on_sale_xpath: '' }
         } catch (error) {
           console.error("Помилка редагування:", error)
           alert('Помилка при редагуванні X-Path')
@@ -162,12 +153,8 @@
 
       const handleDelete = async () => {
         try {
-          const response = await fetch(`http://localhost:8000/stores/${formData.value.name}`, {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' }
-          })
-          const result = await response.json()
-          console.log("Видалення X-Path:", result)
+          const response = await apiClient.delete(`/xpath/store/${formData.value.name}`)
+          console.log("Видалення X-Path:", response.data)
           alert(`Видалено X-Path для магазину: ${formData.value.name}`)
           formData.value = { ...formData.value, name: '' }
         } catch (error) {

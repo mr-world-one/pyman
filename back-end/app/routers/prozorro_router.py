@@ -1,34 +1,16 @@
-#third-party imports
-from fastapi import APIRouter, HTTPException
-
-#local imports
-from app.prozorro_functionality.prozorro import get_contract_info
-
-import sys
-sys.path.append("C:\\Users\\it-support\\pyman")  
-from fastapi import FastAPI, HTTPException, Depends
-import asyncpg
-import os
-from dotenv import load_dotenv
-from sqlalchemy.ext.asyncio import create_async_engine
+import asyncio
 import logging
-from fastapi.middleware.cors import CORSMiddleware
-import pandas as pd
-from scraper.parsers.rozetka_parser import RozetkaParser
-from fastapi import FastAPI, File, UploadFile
-from statistics import mean
-import logging
-from io import BytesIO
-from openpyxl import load_workbook
-from pydantic import BaseModel
-from typing import List, Optional
+from typing import Optional, List
+
+from fastapi import APIRouter, HTTPException, Depends, Query
+
 from app.prozorro_functionality.prozorro import get_contract_info
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
-from urllib.parse import quote
-import time
-import re
+from app.routers.authorization import get_current_user
+from app.services.parser_service import (
+    search_products_async,
+    search_products_for_items,
+    get_available_stores,
+)
 
 prozorro_router = APIRouter()
 
@@ -38,43 +20,46 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# @prozorro_router.get("/contract_info/{contract_id}")
-# def tender_items(contract_id: str):
-#     return get_contract_info(contract_id)
+
+@prozorro_router.get("/stores/available")
+async def list_available_stores():
+    """Return list of stores available for price comparison."""
+    return get_available_stores()
+
 
 @prozorro_router.get("/search-tender/{contract_id}")
-def prozorro_data(contract_id : str):
-    rozetka = RozetkaParser()
+async def prozorro_data(
+    contract_id: str,
+    stores: str = Query(default="rozetka", description="Comma-separated store keys: rozetka,silpo,epicentr,citadel"),
+    current_user: str = Depends(get_current_user),
+):
+    """
+    Search Prozorro tender by contract ID and compare prices from selected stores.
+    Selenium runs in background threads via asyncio.to_thread().
+    """
+    store_list = [s.strip() for s in stores.split(",") if s.strip()]
+    if not store_list:
+        store_list = ["rozetka"]
+
     try:
         pr_data = get_contract_info(contract_id)
-        d = [] 
-        
-        for row in pr_data:
-            product_name = row['name']
-            logger.info(f"Searching for: '{product_name}'")
-            try:
-                rozetka_data = rozetka.find_n_products(
-                    product=product_name,
-                    n=1,
-                    fast_parse=False,
-                    ignore_price_format=True,
-                    raise_exception=False
-                )
-                d.extend(rozetka_data)
-                logger.info(f"Success: Found {len(rozetka_data)} products for '{product_name}'")
-            except Exception as e:
-                logger.warning(f"No result for '{product_name}': {str(e)}")
-                continue
-        
-        # Повертаємо обидва набори даних
+        store_data = await search_products_for_items(
+            items=pr_data,
+            stores=store_list,
+            n=1,
+        )
+
         return {
             "status": "success",
             "message": "Products found",
-            "prozorro_data": pr_data,  # Дані з Excel
-            "rozetka_data": d          # Дані з Rozetka
+            "prozorro_data": pr_data,
+            "store_data": store_data,
+            "stores_used": store_list,
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error in upload_excel: {str(e)}")
-        return str(e)
+        logger.error(f"Error in prozorro_data: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 

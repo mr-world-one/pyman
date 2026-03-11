@@ -25,33 +25,27 @@
 
 <script>
   import { ref } from 'vue';
-  import { authService } from '@/api/authService';
+  import { useAuthStore } from '@/stores/auth';
   import { useRouter } from 'vue-router';
 
   export default {
     name: 'SignIn',
     setup() {
       const router = useRouter();
+      const authStore = useAuthStore();
       const email = ref('');
       const password = ref('');
       const error = ref('');
       const loading = ref(false);
 
       const handleLogin = async () => {
-        console.log('handleLogin called with:', { email: email.value, password: password.value });
-        if (loading.value) return; // Запобігаємо повторним клікам
+        if (loading.value) return;
         loading.value = true;
 
         try {
-          error.value = ''; // Очищаємо попередні помилки
-          const response = await authService.login(email.value, password.value);
-          console.log('Успішний вхід, response:', response);
-          if (response.access_token) {
-            console.log('Token saved, redirecting to /');
-            router.push('/');
-          } else {
-            throw new Error('No access token in response');
-          }
+          error.value = '';
+          await authStore.login(email.value, password.value);
+          router.push('/');
         } catch (err) {
           console.error('Помилка входу:', err);
           error.value = err.response?.data?.detail || err.message || 'Помилка входу. Перевірте email або пароль';

@@ -79,6 +79,14 @@ back-end/app/routers/__pycache__/
 back-end/app/models/__pycache__/
 back-end/app/schemas/__pycache__/
 
-#.env
-back-end/app/.env
-main
+# Environment files with secrets
+.env
+**/.env
+back-end/.env
+scraper/.env
+
+# Temporary PDF files
+back-end/app/prozorro_functionality/temp_pdf/*.pdf
+
+# Docker data volumes
+postgres_data/

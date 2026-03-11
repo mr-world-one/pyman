@@ -1,30 +1,20 @@
-import sys
-sys.path.append("C:\\Users\\it-support\\pyman")  
-from fastapi import FastAPI, HTTPException, Depends
+import asyncio
 import asyncpg
+import logging
 import os
+from io import BytesIO
+from typing import List, Optional
+
+from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Query
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import create_async_engine
-import logging
-from fastapi.middleware.cors import CORSMiddleware
-import pandas as pd
-from scraper.parsers.rozetka_parser import RozetkaParser
-from fastapi import FastAPI, File, UploadFile
-from app.routers.prozorro_router import prozorro_router
-from statistics import mean
-import logging
-from io import BytesIO
 from openpyxl import load_workbook
 from pydantic import BaseModel
-from typing import List, Optional
-from .prozorro_functionality.prozorro import get_contract_info
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
-from urllib.parse import quote
-import time
-import re
+
+from app.routers.prozorro_router import prozorro_router
 from app.routers.ai_assistant import router as assistant_router
+from app.services.parser_service import search_products_async, get_available_stores
 
 
 
@@ -54,10 +44,14 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:5176", "http://localhost:5177",
-        "http://localhost:5178", "http://localhost:5179", "http://localhost:5180", "http://localhost:5181", "http://localhost:5182",
-        "http://127.0.0.1:5173", "http://127.0.0.1:5174", "http://127.0.0.1:5175", "http://127.0.0.1:5176", "http://127.0.0.1:5177",
-        "http://127.0.0.1:5178", "http://127.0.0.1:5179", "http://127.0.0.1:5180", "http://127.0.0.1:5181", "http://127.0.0.1:5182"
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000",
+        "http://frontend",
+        "http://frontend:80",
+        os.getenv("FRONTEND_URL", "http://localhost:5173"),
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -200,74 +194,51 @@ def parse_excel_file(file_content: bytes):
         raise ValueError(f"Error parsing Excel file: {str(e)}")
 
 @app.post("/excel-page")
-async def upload_excel(file: UploadFile = File(...)):
-    rozetka = RozetkaParser()
+async def upload_excel(
+    file: UploadFile = File(...),
+    stores: str = Query(default="rozetka", description="Comma-separated store keys: rozetka,silpo,epicentr,citadel"),
+    current_user: str = Depends(get_current_user),
+):
+    """
+    Upload an Excel file with tender items and compare prices from selected stores.
+    Selenium parsers run in background threads via asyncio.to_thread().
+    """
+    store_list = [s.strip() for s in stores.split(",") if s.strip()]
+    if not store_list:
+        store_list = ["rozetka"]
+
     try:
         file_content = await file.read()
-        excel_data = parse_excel_file(file_content)  # Зберігаємо дані з Excel
-        
-        d = []  # Результати з Rozetka
-        
+        excel_data = parse_excel_file(file_content)
+
+        # Search products across stores asynchronously
+        store_data = []
         for row in excel_data:
             product_name = row['product_name']
-            logger.info(f"Searching for: '{product_name}'")
+            logger.info(f"Searching for: '{product_name}' in stores: {store_list}")
             try:
-                rozetka_data = rozetka.find_n_products(
-                    product=product_name,
+                results = await search_products_async(
+                    product_name=product_name,
+                    stores=store_list,
                     n=1,
                     fast_parse=False,
                     ignore_price_format=True,
-                    raise_exception=True
                 )
-                d.extend(rozetka_data)
-                logger.info(f"Success: Found {len(rozetka_data)} products for '{product_name}'")
+                store_data.extend(results)
+                logger.info(f"Found {len(results)} products for '{product_name}'")
             except Exception as e:
                 logger.warning(f"No result for '{product_name}': {str(e)}")
                 continue
-        
-        # Повертаємо обидва набори даних
+
         return {
             "status": "success",
             "message": "Products found",
-            "excel_data": excel_data,  # Дані з Excel
-            "rozetka_data": d          # Дані з Rozetka
+            "excel_data": excel_data,
+            "store_data": store_data,
+            "stores_used": store_list,
         }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Error in upload_excel: {str(e)}")
-        return str(e)
-
-# @app.post("/search-tender")
-# async def prozorro_data(contract_id : str):
-#     rozetka = RozetkaParser()
-#     try:
-#         pr_data = get_contract_info(contract_id)
-#         d = [] 
-        
-#         for row in pr_data:
-#             product_name = row['name']
-#             logger.info(f"Searching for: '{product_name}'")
-#             try:
-#                 rozetka_data = rozetka.find_n_products(
-#                     product=product_name,
-#                     n=1,
-#                     fast_parse=False,
-#                     ignore_price_format=True,
-#                     raise_exception=False
-#                 )
-#                 d.extend(rozetka_data)
-#                 logger.info(f"Success: Found {len(rozetka_data)} products for '{product_name}'")
-#             except Exception as e:
-#                 logger.warning(f"No result for '{product_name}': {str(e)}")
-#                 continue
-        
-#         # Повертаємо обидва набори даних
-#         return {
-#             "status": "success",
-#             "message": "Products found",
-#             "excel_data": pr_data,  # Дані з Excel
-#             "rozetka_data": d          # Дані з Rozetka
-#         }
-#     except Exception as e:
-#         logger.error(f"Error in upload_excel: {str(e)}")
-#         return str(e)
-
+        raise HTTPException(status_code=500, detail=str(e))

@@ -50,13 +50,14 @@
 
 <script>
 import { ref } from 'vue'
-import { authService } from '@/api/authService'
+import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 
 export default {
   name: 'RegistrationView',
   setup() {
     const router = useRouter()
+    const authStore = useAuthStore()
     const name = ref('')
     const email = ref('')
     const password = ref('')
@@ -64,17 +65,12 @@ export default {
 
     const handleRegister = async () => {
       try {
-        error.value = '' // Clear previous errors
-        const response = await authService.register({
+        error.value = ''
+        await authStore.register({
           name: name.value,
           email: email.value,
           password: password.value
         })
-        console.log('Registration successful:', response)
-        
-        // After successful registration, login the user
-        const loginResponse = await authService.login(email.value, password.value)
-        localStorage.setItem('token', loginResponse.access_token)
         router.push('/')
       } catch (err) {
         console.error('Registration error:', err)

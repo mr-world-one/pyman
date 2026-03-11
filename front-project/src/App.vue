@@ -1,33 +1,26 @@
 <script>
-import { ref, onMounted } from 'vue';
+import { computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { apiClient } from '@/api/config';
+import { useAuthStore } from '@/stores/auth';
+import { ref } from 'vue';
 
 export default {
   name: "App",
   setup() {
     const router = useRouter();
+    const authStore = useAuthStore();
     const menuOpen = ref(false);
-    const isAuthenticated = ref(false);
+
+    const isAuthenticated = computed(() => authStore.isAuthenticated);
 
     const toggleMenu = () => {
       menuOpen.value = !menuOpen.value;
     };
 
-    const checkAuth = () => {
-      const token = localStorage.getItem('token');
-      isAuthenticated.value = !!token;
-    };
-
     const handleLogout = async () => {
-      localStorage.removeItem('token');
-      isAuthenticated.value = false;
+      authStore.logout();
       await router.push('/signin');
     };
-
-    onMounted(() => {
-      checkAuth();
-    });
 
     return { 
       menuOpen, 
