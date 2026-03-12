@@ -1,45 +1,93 @@
-from scraper.parsers import Website, ProductXpaths, NavigationXPaths
-from scraper.parsers.base_parser import BaseParser
-from scraper.utils.database import Database
+import json
+import logging
+import re
 
-class EpicentrParser(BaseParser):
-    def __init__(self):
-        self.db = Database()
+import requests
 
-        website_info = self.db.get_website_info('https://epicentrk.ua/')
+from scraper.parsers import ProductInfo
 
-        if not website_info:
-            print("Дані для Epicentr не знайдено в базі, додаємо...")
-            website_info = self._create_default_website()
-            self.db.add_website(website_info)
+logger = logging.getLogger(__name__)
 
-        super().__init__(website_info)
+EPICENTR_SEARCH_URL = "https://epicentrk.ua/ua/search/"
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Accept": "text/html",
+}
 
-    def _create_default_website(self):
-        return Website(
-            url='https://epicentrk.ua/',
-            price_format=r'\d+',
-            product_xpaths=ProductXpaths(
-                price_on_sale='//div/div[1]/div[2]/data/data[1]',
-                price_without_sale='//div/div[1]/div[1]/s/data',
-                price='//div/div[1]/div[1]/data/data[1]',
-                availability='//*[@id="main"]/div[2]/div/div/button',
-                title='//*[@id="__template"]/main/div[1]/div/div/div/header/div/div[1]/h1',
-                available_text='КУПИТИ'
-            ),
-            website_navigation=NavigationXPaths(
-                search_field='//*[@id="global-site-header"]/header/div/div[3]/form/input',
-                submit_button='//*[@id="global-site-header"]/header/div/div[3]/form/button[2]',
-                search_result_products_xpath_templates='//div[3]/div/h2/a',
-                search_result_link_attribute='href'
-            )
+
+class EpicentrParser:
+
+    def _close(self):
+        pass
+
+    def _search_products(self, product: str, n: int) -> list:
+        """Fetch Epicentr search page and parse schema.org JSON-LD product data."""
+        resp = requests.get(
+            EPICENTR_SEARCH_URL,
+            params={"q": product},
+            headers=HEADERS,
+            timeout=20,
         )
+        resp.raise_for_status()
+
+        # JSON-LD is embedded in regular <script> tags (not type="application/ld+json")
+        products = []
+        for block in re.findall(r'<script[^>]*>(.*?)</script>', resp.text, re.DOTALL):
+            block = block.strip()
+            if not (block.startswith('{') and '"ItemList"' in block):
+                continue
+            try:
+                data = json.loads(block)
+                if data.get("@type") == "ItemList":
+                    for item in data.get("itemListElement", [])[:n]:
+                        product_data = item.get("item", {})
+                        if product_data.get("@type") == "Product":
+                            products.append(product_data)
+            except (json.JSONDecodeError, KeyError):
+                continue
+
+        return products[:n]
 
     def find_n_products(self, product: str, n: int, fast_parse=True, ignore_price_format=True, raise_exception=False):
-        return super()._find_n_products(
-            product=product,
-            n=n,
-            fast_parse=fast_parse,
-            ignore_price_format=ignore_price_format,
-            raise_exception=raise_exception
-        )
+        results = []
+        try:
+            items = self._search_products(product, n)
+            logger.info(f"[epicentr] Found {len(items)} products for '{product}'")
+
+            for item in items:
+                try:
+                    offers = item.get("offers", {})
+                    price = None
+                    if isinstance(offers, dict):
+                        price_str = offers.get("price")
+                        if price_str is not None:
+                            try:
+                                price = float(price_str)
+                            except (ValueError, TypeError):
+                                price = price_str
+
+                    url = item.get("url", "")
+                    if url and not url.startswith("http"):
+                        url = f"https://epicentrk.ua{url}"
+
+                    info = ProductInfo(
+                        url=url,
+                        price=price,
+                        is_on_sale=False,
+                        price_on_sale=None,
+                        is_available=offers.get("availability", "") == "https://schema.org/InStock" if isinstance(offers, dict) else None,
+                        title=item.get("name", ""),
+                    )
+                    results.append(info)
+                except Exception as e:
+                    logger.warning(f"[epicentr] Failed to parse product: {e}")
+                    if raise_exception:
+                        raise
+
+        except Exception as e:
+            logger.warning(f"[epicentr] Search failed for '{product}': {e}")
+            if raise_exception:
+                raise
+
+        logger.info(f"[epicentr] Returning {len(results)} products for '{product}'")
+        return results

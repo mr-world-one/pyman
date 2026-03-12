@@ -1,72 +1,70 @@
-from scraper.parsers.base_parser import BaseParser
-from scraper.parsers import Website, ProductXpaths, NavigationXPaths, logger
-from scraper.parsers.exceptions import PriceIsNotNormalizedException, PriceNotFoundException
-from scraper.utils.database import Database
+import logging
+import requests
 
-class SilpoParser(BaseParser):
+from scraper.parsers import ProductInfo
 
-    def __init__(self):
-        self.db = Database()
+logger = logging.getLogger(__name__)
 
-        website_info = self.db.get_website_info('https://silpo.ua')
+SILPO_API_URL = "https://sf-ecom-api.silpo.ua/v1/uk/branches/00000000-0000-0000-0000-000000000000/products"
+SILPO_BASE_URL = "https://silpo.ua"
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Accept": "application/json",
+}
 
-        if not website_info:
-            print("Дані для SilpoParser не знайдено в базі, додаємо...")
-            website_info = self._create_default_website()
-            self.db.add_website(website_info)
 
-        super().__init__(website_info)
+class SilpoParser:
 
-    def _create_default_website(self):
-        return Website(
-            url='https://silpo.ua',
-            price_format=r'\d+',
-            product_xpaths=ProductXpaths(price_on_sale='/html/body/sf-shop-silpo-root/shop-silpo-root-shell/silpo-shell-main/div/div[3]/silpo-product-product-page/div/div/div/div/div[2]/div/div/div[1]/div[1]',
-                                         price_without_sale='/html/body/sf-shop-silpo-root/shop-silpo-root-shell/silpo-shell-main/div/div[3]/silpo-product-product-page/div/div/div/div/div[2]/div/div/div[1]/div[2]/div[1]',
-                                         price='/html/body/sf-shop-silpo-root/shop-silpo-root-shell/silpo-shell-main/div/div[3]/silpo-product-product-page/div/div/div/div/div[2]/div/div/div[1]/div',
-                                         availability='/html/body/sf-shop-silpo-root/shop-silpo-root-shell/silpo-shell-main/div/div[3]/silpo-product-product-page/div/div/div/div/div[2]/div/div/div[2]/shop-silpo-common-page-add-to-basket/div/div/button',
-                                         title='/html/body/sf-shop-silpo-root/shop-silpo-root-shell/silpo-shell-main/div/div[3]/silpo-product-product-page/div/div/div/div/div[2]/div/h1',
-                                         available_text='У кошик'),
-            website_navigation=NavigationXPaths(search_field='/html/body/sf-shop-silpo-root/shop-silpo-root-shell/silpo-shell-main/div/div[1]/silpo-shell-header/silpo-shell-desktop-header/div/div/div[1]/div[3]/silpo-search-suggestion/silpo-search-input/div/input',
-                                                submit_button=None,
-                                                search_result_products_xpath_templates='//shop-silpo-common-product-card/div/a',
-                                                search_result_link_attribute='href')
+    def _close(self):
+        pass
+
+    def _search_products(self, product: str, limit: int) -> list:
+        """Search Silpo API and return product items."""
+        resp = requests.get(
+            SILPO_API_URL,
+            params={"search": product, "limit": limit, "offset": 0},
+            headers=HEADERS,
+            timeout=15,
         )
-
-    def get_price(self, url, ignore_price_format, open_page=True):
-        if open_page:
-            self.open_page(url)
-
-        try:
-            return self._parse_price(xpath=self.website_info.product_xpaths.PRICE_WITHOUT_SALE, ignore_price_format=ignore_price_format)
-        except PriceIsNotNormalizedException:
-            raise
-        except Exception:
-            message = f"{self.website_info}: Couldn't get price with {self.website_info.product_xpaths.PRICE}, maybe product is not on sale."
-            logger.error(message)
-            try:
-                return self._parse_price(xpath=self.website_info.product_xpaths.PRICE, ignore_price_format=ignore_price_format)
-            except Exception as e:
-                message = f"{self.website_info}: Couldn't get price with {self.website_info.product_xpaths.PRICE_WITHOUT_SALE}, unknown reason"
-                logger.exception(message)
-                raise PriceNotFoundException from e
-
-    def get_price_on_sale(self, url, ignore_price_format, open_page=True):
-        if open_page:
-            self.open_page(url)
-
-        try:
-            price_on_sale = self._parse_price(
-                xpath=self.website_info.product_xpaths.PRICE_ON_SALE, ignore_price_format=ignore_price_format)
-            if self.get_price(url=url, ignore_price_format=ignore_price_format, open_page=False) == price_on_sale:
-                raise PriceNotFoundException
-            return price_on_sale
-        except PriceIsNotNormalizedException:
-            raise
-        except Exception as e:
-            message = f'{self.website_info}: Unable to get price on sale with {self.website_info.product_xpaths.PRICE_ON_SALE}, maybe product is not on sale.'
-            logger.exception(message)
-            raise PriceNotFoundException from e
+        resp.raise_for_status()
+        return resp.json().get("items", [])
 
     def find_n_products(self, product, n, fast_parse=True, raise_exception=False, ignore_price_format=True):
-        return super()._find_n_products(product, n, fast_parse=fast_parse, raise_exception=raise_exception, ignore_price_format=ignore_price_format)
+        results = []
+        try:
+            items = self._search_products(product, n)
+            logger.info(f"[silpo] Found {len(items)} products for '{product}'")
+
+            for item in items[:n]:
+                try:
+                    price = item.get("price")
+                    old_price = item.get("oldPrice")
+                    is_on_sale = old_price is not None and old_price != price and old_price > 0
+                    price_on_sale = price if is_on_sale else None
+                    actual_price = old_price if is_on_sale else price
+
+                    slug = item.get("slug", "")
+                    section_slug = item.get("sectionSlug", "")
+                    url = f"{SILPO_BASE_URL}/product/{slug}" if slug else SILPO_BASE_URL
+
+                    info = ProductInfo(
+                        url=url,
+                        price=actual_price,
+                        is_on_sale=is_on_sale,
+                        price_on_sale=price_on_sale,
+                        is_available=True,  # API only returns available products
+                        title=item.get("title", ""),
+                    )
+                    results.append(info)
+                except Exception as e:
+                    logger.warning(f"[silpo] Failed to parse product: {e}")
+                    if raise_exception:
+                        raise
+
+        except Exception as e:
+            logger.warning(f"[silpo] Search failed for '{product}': {e}")
+            if raise_exception:
+                raise
+
+        logger.info(f"[silpo] Returning {len(results)} products for '{product}'")
+        return results

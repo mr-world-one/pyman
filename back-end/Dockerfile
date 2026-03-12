@@ -59,6 +59,9 @@ RUN pip install --no-cache-dir "sqlalchemy[asyncio]" asyncpg python-dotenv openp
 # Ensure email-validator is present (pydantic[email] needs it)
 RUN pip install --no-cache-dir email-validator
 
+# Google Gemini API for LLM-based product validation
+RUN pip install --no-cache-dir google-generativeai
+
 # Copy source code
 COPY back-end/ /app/back-end/
 COPY scraper/ /app/scraper/

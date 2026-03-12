@@ -50,6 +50,8 @@ services:
       # Selenium / Chrome
       CHROME_BIN: /usr/bin/chromium
       CHROMEDRIVER_PATH: /usr/bin/chromedriver
+      # Gemini API for LLM product validation
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     ports:
       - "8000:8000"
     volumes:

@@ -9,6 +9,7 @@ from app.routers.authorization import get_current_user
 from app.services.parser_service import (
     search_products_async,
     search_products_for_items,
+    search_and_validate_items,
     get_available_stores,
 )
 
@@ -43,17 +44,17 @@ async def prozorro_data(
 
     try:
         pr_data = get_contract_info(contract_id)
-        store_data = await search_products_for_items(
+        matched_items = await search_and_validate_items(
             items=pr_data,
             stores=store_list,
-            n=1,
+            n=3,
         )
 
         return {
             "status": "success",
             "message": "Products found",
             "prozorro_data": pr_data,
-            "store_data": store_data,
+            "matched_items": matched_items,
             "stores_used": store_list,
         }
     except HTTPException:
