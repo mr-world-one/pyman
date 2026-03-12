@@ -10,7 +10,7 @@ import os
 BASE_URL = 'https://public.api.openprocurement.org/api/2.5'
 
 def get_contract(contract_id):
-    url = f'{BASE_URL}/contracts/{contract_id}'
+    url = f'{BASE_URL}/tenders/{contract_id}'
 
     try:
         response = requests.get(url)

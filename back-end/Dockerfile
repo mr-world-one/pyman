@@ -56,6 +56,9 @@ RUN pip install --no-cache-dir selenium webdriver-manager psycopg2-binary
 # Install additional packages needed for async DB and Excel parsing
 RUN pip install --no-cache-dir "sqlalchemy[asyncio]" asyncpg python-dotenv openpyxl pandas
 
+# Ensure email-validator is present (pydantic[email] needs it)
+RUN pip install --no-cache-dir email-validator
+
 # Copy source code
 COPY back-end/ /app/back-end/
 COPY scraper/ /app/scraper/
