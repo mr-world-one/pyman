@@ -3,10 +3,11 @@ import logging
 import httpx
 from typing import Optional, List
 
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks
 
-from app.prozorro_functionality.prozorro import get_contract_info
+from app.prozorro_functionality.prozorro import get_contract_info, get_tender_documents, extract_text_from_docx, extract_text_from_pdf_extended
 from app.routers.authorization import get_current_user
+from app.services.llm_validator import analyze_document_text
 from app.services.parser_service import (
     search_products_async,
     search_products_for_items,
@@ -101,5 +102,68 @@ async def prozorro_data(
     except Exception as e:
         logger.error(f"Error in prozorro_data: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+async def process_tender_documents_task(contract_id: str):
+    logger.info(f"Start background doc analysis: {contract_id}")
+    try:
+        if contract_id.upper().startswith("UA-"):
+            contract_id = await convert_ua_to_hex_id(contract_id.upper())
+        
+        docs = get_tender_documents(contract_id)
+        if not docs:
+            logger.info("Не знайдено документів для аналізу.")
+            return
+
+        all_text = []
+        async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
+            for doc in docs[:3]:  # Обмеження до 3-х документів
+                url = doc.get("url")
+                if not url:
+                    continue
+                try:
+                    resp = await client.get(url)
+                    resp.raise_for_status()
+                    content = resp.content
+                    
+                    title = doc.get("title", "").lower()
+                    extracted = ""
+                    if title.endswith(".docx"):
+                        extracted = extract_text_from_docx(content)
+                    elif title.endswith(".pdf"):
+                        # PyMuPDF та OCR викликаються в окремому потоці
+                        import asyncio
+                        extracted = await asyncio.to_thread(extract_text_from_pdf_extended, content)
+                    
+                    if extracted:
+                        all_text.append(f"--- Документ: {title} ---\n{extracted}")
+                except Exception as e:
+                    logger.error(f"Помилка обробки документа {url}: {e}")
+
+        combined_text = "\n\n".join(all_text)
+        if not combined_text:
+            logger.info("Не вдалося витягнути текст із документів.")
+            return
+            
+        logger.info(f"Витягнуто {len(combined_text)} символів. Відправка в LLM...")
+        analysis_result = await analyze_document_text(combined_text)
+        
+        logger.info(f"Результат LLM для {contract_id}: {analysis_result}")
+        # Тут можна зберегти результати в базу даних
+        
+    except Exception as e:
+        logger.error(f"Помилка виконання фонової таски аналізу документів: {e}")
+
+@prozorro_router.post("/analyze-documents/{ua_id}")
+async def analyze_documents_endpoint(
+    ua_id: str,
+    background_tasks: BackgroundTasks,
+    current_user: str = Depends(get_current_user)
+):
+    """
+    Асинхронний запуск аналізу тендерних документів.
+    """
+    background_tasks.add_task(process_tender_documents_task, ua_id)
+    return {"status": "success", "message": "Процес аналізу документів запущений у фоні.", "contract_id": ua_id}
+
 
 

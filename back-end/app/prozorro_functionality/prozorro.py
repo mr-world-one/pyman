@@ -207,19 +207,98 @@ def get_contract_info(contract_id):
                     items.append(data)
                     return items
                 else:
-                    break
+                    if validate_name(name):
+                        items.append(data)
+                        continue
+                    else:
+                        break
 
+            items.append(data)
+            
+    if len(items) > 0:
+        return items
 
     # if price is not placed for the first element or if it cannot be calculated then program will parse the pdf to search the needed infomation
     documents = contract.get('documents', None)
     if documents:
-        url = get_pdf_url(documents)
-        items = parse_pdf(url)
-        if len(items) == 0:
-            raise HTTPException(status_code=404, detail="Could not find items in specification!")
+        try:
+            url = get_pdf_url(documents)
+            items = parse_pdf(url)
+            if len(items) == 0:
+                raise HTTPException(status_code=404, detail="Could not find items in specification!")
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=404, detail=str(e))
     else:
         raise HTTPException(status_code=404, detail="Information about tender could not be found!")
 
     return items
 
 # print(get_contract_info("33f405c1a83b4e3b9835e546cb8db51f"))
+
+import io
+import docx
+import pandas as pd
+
+def get_tender_documents(contract_id):
+    url = f"{BASE_URL}/tenders/{contract_id}/documents"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        docs = response.json().get("data", [])
+        valid_docs = []
+        for doc in docs:
+            if doc.get('confidentiality') == 'public':
+                title = doc.get('title', '').lower()
+                if (title.endswith('.pdf') or title.endswith('.docx')) and not title.endswith('.p7s'):
+                    valid_docs.append(doc)
+        
+        unique_docs = {}
+        for d in valid_docs:
+            unique_docs[d.get('title')] = d
+        return list(unique_docs.values())
+    except Exception as e:
+        print(f"Error getting documents: {e}")
+        return []
+
+def extract_text_from_docx(content: bytes) -> str:
+    doc = docx.Document(io.BytesIO(content))
+    text = []
+    for paragraph in doc.paragraphs:
+        if paragraph.text.strip():
+            text.append(paragraph.text.strip())
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                if cell.text.strip():
+                    text.append(cell.text.strip())
+    return "\n".join(text)
+
+def extract_text_from_pdf_extended(content: bytes) -> str:
+    import fitz
+    import os
+    doc = fitz.open(stream=content, filetype="pdf")
+    text = "\n".join(page.get_text() for page in doc)
+    
+    if len(text.strip()) > 50:
+        return text
+        
+    path_to_pdf = 'app/prozorro_functionality/temp_pdf/temp_pdf_for_text.pdf'
+    path_to_ocred = 'app/prozorro_functionality/temp_pdf/page_txt_ocred.pdf'
+    
+    with open(path_to_pdf, 'wb') as f:
+        f.write(content)
+        
+    try:
+        ocr_pdf(path_to_pdf, "txt")
+        doc_ocred = fitz.open(path_to_ocred)
+        ocred_text = "\n".join(page.get_text() for page in doc_ocred)
+        return ocred_text
+    except Exception as e:
+        print(f"OCR Error: {e}")
+        doc_tables = get_table_from_pdf(path_to_pdf)
+        if doc_tables:
+            concat_table = pd.concat(doc_tables, ignore_index=True)
+            return concat_table.to_string()
+        return ""

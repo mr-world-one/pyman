@@ -62,7 +62,7 @@
             <div class="summary-value">{{ totalStoreMatches }}</div>
             <div class="summary-label">Знайдено в магазинах</div>
           </div>
-          <div class="summary-card" :class="overallSavings >= 0 ? 'card-positive' : 'card-negative'">
+          <div class="summary-card" :class="overallSavings >= 0 ? 'card-positive' : 'card-negative'" v-if="hasPricesTender">
             <div class="summary-icon">{{ overallSavings >= 0 ? '📈' : '📉' }}</div>
             <div class="summary-value">{{ overallSavings >= 0 ? '+' : '' }}{{ overallSavings.toFixed(2) }} грн</div>
             <div class="summary-label">Тендер {{ overallSavings >= 0 ? 'дорожче' : 'дешевше' }} ринку</div>
@@ -79,7 +79,8 @@
           <div class="product-header">
             <div class="product-name">{{ group.name }}</div>
             <div class="product-meta">
-              <span class="meta-badge tender-badge">Тендер: <strong>{{ group.tender_price.toFixed(2) }} грн</strong></span>
+              <span class="meta-badge tender-badge" v-if="group.tender_price > 0">Тендер: <strong>{{ group.tender_price.toFixed(2) }} грн</strong></span>
+              <span class="meta-badge tender-badge" v-else>Тендер: <strong>Не вказано</strong></span>
               <span class="meta-badge qty-badge" v-if="group.quantity">{{ group.quantity }} {{ group.unit_name || 'шт' }}</span>
               <span class="meta-badge total-badge" v-if="group.total_price">Всього: {{ group.total_price.toFixed(2) }} грн</span>
             </div>
@@ -162,6 +163,10 @@
       };
     },
     computed: {
+      hasPricesTender() {
+        if (!this.analytics) return false;
+        return this.analytics.some(g => g.tender_price > 0);
+      },
       totalStoreMatches() {
         if (!this.analytics) return 0;
         return this.analytics.reduce((sum, g) => sum + g.matches.length, 0);
@@ -247,7 +252,7 @@
               original_price: originalPrice,
               is_on_sale: !!item.price_on_sale && item.price_on_sale !== item.price,
               is_available: item.is_available,
-              diff: effectivePrice !== null ? tenderPrice - effectivePrice : null,
+              diff: (effectivePrice !== null && tenderPrice > 0) ? tenderPrice - effectivePrice : null,
               store_weight_g: item.store_weight_g || null,
               tender_weight_g: item.tender_weight_g || null,
               price_per_unit: item.price_per_unit || null,
@@ -263,7 +268,7 @@
             total_price: tender.total_price ? parseFloat(tender.total_price) : null,
             matches,
           };
-        }).filter((item) => item.name && item.tender_price);
+        }).filter((item) => item.name);
       },
       formatPrice(val) {
         if (val === null || val === undefined) return 'Н/Д';

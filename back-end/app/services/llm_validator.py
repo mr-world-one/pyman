@@ -51,7 +51,7 @@ def _get_model():
         import google.generativeai as genai
         genai.configure(api_key=api_key)
         _gemini_model = genai.GenerativeModel(
-            "gemini-2.0-flash",
+            "gemini-1.5-flash-8b",
             generation_config={"temperature": 0.0, "response_mime_type": "application/json"},
         )
         logger.info("Gemini model initialized successfully")
@@ -224,3 +224,27 @@ async def validate_matches(
     logger.info(f"LLM validation for '{tender_name[:60]}': {relevant_count}/{len(enriched)} relevant")
 
     return enriched
+
+async def analyze_document_text(text: str) -> Optional[List[Dict[str, Any]]]:
+    """Аналізує витягнутий текст тендерної документації за допомогою LLM."""
+    model = _get_model()
+    if not model:
+        logger.warning("Модель Gemini не налаштована для аналізу документів.")
+        return None
+
+    prompt = f"""Проаналізуй текст тендерної документації. Знайди технічні специфікації товарів. 
+Витягни: назву товару, ДСТУ/ГОСТ, кількість, одиниці виміру та детальні технічні характеристики. 
+Поверни результат у форматі JSON масиву.
+
+Текст документації:
+{text[:30000]}"""
+
+    try:
+        response = await model.generate_content_async(prompt)
+        logger.info(f"LLM response for doc analysis: {response.text[:200]}")
+        data = _parse_response(response.text, 0)
+        return data
+    except Exception as e:
+        logger.error(f"Помилка аналізу тексту документа: {e}")
+        return None
+
