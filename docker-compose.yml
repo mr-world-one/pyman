@@ -54,8 +54,6 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     ports:
       - "8000:8000"
-    volumes:
-      - ./back-end/app/prozorro_functionality/temp_pdf:/app/back-end/app/prozorro_functionality/temp_pdf
 
   # ─── Vue 3 Frontend (nginx) ──────────────────────────────
   frontend:

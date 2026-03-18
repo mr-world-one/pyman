@@ -51,7 +51,7 @@ def _get_model():
         import google.generativeai as genai
         genai.configure(api_key=api_key)
         _gemini_model = genai.GenerativeModel(
-            "gemini-1.5-flash-8b",
+            "gemini-2.0-flash-lite",
             generation_config={"temperature": 0.0, "response_mime_type": "application/json"},
         )
         logger.info("Gemini model initialized successfully")
@@ -225,6 +225,46 @@ async def validate_matches(
 
     return enriched
 
+async def extract_items_from_text(text: str) -> Optional[List[Dict[str, Any]]]:
+    """Extract structured tender items (name, quantity, unit, prices) from PDF text via Gemini."""
+    model = _get_model()
+    if not model:
+        logger.warning("Gemini model not configured — cannot extract items from text")
+        return None
+
+    prompt = f"""Ти — експерт з аналізу тендерної документації в Україні.
+
+ЗАДАЧА: Знайди у тексті специфікації перелік товарів/послуг із цінами та кількостями.
+
+Поверни JSON масив об'єктів із полями:
+- "name" (string) — назва товару/послуги
+- "quantity" (number) — кількість
+- "unit_name" (string) — одиниця виміру (шт, кг, л, упак, тощо)
+- "unit_price" (number) — ціна за одиницю
+- "total_price" (number) — загальна вартість позиції
+
+ПРАВИЛА:
+- Використовуй ціну БЕЗ ПДВ, якщо вказано обидві
+- Повертай числа, а не рядки
+- Пропускай рядки з підсумками, заголовками, нумерацією
+- Якщо товарів не знайдено — поверни порожній масив []
+- Не вигадуй дані — витягуй тільки те, що є в тексті
+
+Текст документації:
+{text[:30000]}"""
+
+    try:
+        response = await model.generate_content_async(prompt)
+        logger.info(f"Gemini item extraction response: {response.text[:300]}")
+        data = _parse_response(response.text, 0)
+        if data is not None:
+            logger.info(f"Extracted {len(data)} items from text")
+        return data
+    except Exception as e:
+        logger.error(f"Failed to extract items from text via Gemini: {e}")
+        return None
+
+
 async def analyze_document_text(text: str) -> Optional[List[Dict[str, Any]]]:
     """Аналізує витягнутий текст тендерної документації за допомогою LLM."""
     model = _get_model()
@@ -232,8 +272,8 @@ async def analyze_document_text(text: str) -> Optional[List[Dict[str, Any]]]:
         logger.warning("Модель Gemini не налаштована для аналізу документів.")
         return None
 
-    prompt = f"""Проаналізуй текст тендерної документації. Знайди технічні специфікації товарів. 
-Витягни: назву товару, ДСТУ/ГОСТ, кількість, одиниці виміру та детальні технічні характеристики. 
+    prompt = f"""Проаналізуй текст тендерної документації. Знайди технічні специфікації товарів.
+Витягни: назву товару, ДСТУ/ГОСТ, кількість, одиниці виміру та детальні технічні характеристики.
 Поверни результат у форматі JSON масиву.
 
 Текст документації:

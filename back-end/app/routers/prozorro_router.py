@@ -83,7 +83,7 @@ async def prozorro_data(
             contract_id = await convert_ua_to_hex_id(contract_id.upper())
             logger.info(f"Отримано внутрішній HEX ID: {contract_id}")
 
-        pr_data = get_contract_info(contract_id)
+        pr_data = await get_contract_info(contract_id)
         matched_items = await search_and_validate_items(
             items=pr_data,
             stores=store_list,

@@ -1,13 +1,23 @@
-import requests
-import pandas as pd
-from fastapi import HTTPException
-import camelot.io as camelot
-from dotenv import load_dotenv
+import asyncio
+import io
+import logging
+import os
+import shutil
+import tempfile
+from typing import Any, Dict, List
+
+import docx
 import fitz
 import ocrmypdf
-import os
+import requests
+from fastapi import HTTPException
+
+from app.services.llm_validator import extract_items_from_text
+
+logger = logging.getLogger(__name__)
 
 BASE_URL = 'https://public.api.openprocurement.org/api/2.5'
+
 
 def get_contract(contract_id):
     url = f'{BASE_URL}/tenders/{contract_id}'
@@ -19,157 +29,131 @@ def get_contract(contract_id):
     except requests.HTTPError as err:
         raise HTTPException(status_code=response.status_code, detail=f"Error: {err}")
 
-def get_pdf_url(documents):
-    url = []
 
+_SUPPORTED_FORMATS = {
+    'application/pdf': 'pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+}
+
+
+def get_document_urls(documents):
+    """Return list of (url, doc_type) tuples for supported public documents."""
+    result = []
     for doc in documents:
-        if doc.get('confidentiality') == 'public' and doc.get('format') == 'application/pdf':
-            url.append(doc.get('url'))
-    if not url:
-        raise Exception("There are not pinned files connected to tender!")
-    return url
+        if doc.get('confidentiality') != 'public':
+            continue
+        fmt = doc.get('format', '')
+        doc_type = _SUPPORTED_FORMATS.get(fmt)
+        if doc_type:
+            result.append((doc.get('url'), doc_type))
+    if not result:
+        raise Exception("There are no supported documents attached to tender!")
+    return result
 
 
-def clear_folder(folder_path):
-    for filename in os.listdir(folder_path):
-        file_path = os.path.join(folder_path, filename)
-        try:
-            if os.path.isfile(file_path) or os.path.islink(file_path):
-                os.unlink(file_path)
-            elif os.path.isdir(file_path):
-                os.rmdir(file_path)
-        except Exception as ex:
-            print(f"Error while deleting {file_path}: {ex}")
-
-
-def get_splited_pdf_by_pages(input_pdf):
-    """This func return list of paths with splited pdf by pages"""
-    doc = fitz.open(input_pdf)
-    splited_pdf = []
-    for i in range(len(doc)):
-        page = fitz.open()
-        path_to_page = f"app/prozorro_functionality/temp_pdf/page_{i}.pdf"
-        page.insert_pdf(doc, from_page=i, to_page=i)
-        page.save(path_to_page)
-        splited_pdf.append(path_to_page)
-    return splited_pdf
-
-
-def ocr_pdf(inputFile, num_of_page, lang = "ukr+eng", pagesegmode = 3, ocr_engine_mode = 1, force_ocr = True, deskew = True, clean_final = True):
-
+def ocr_pdf(input_file: str, output_file: str, lang: str = "ukr+eng"):
+    """Run OCR on a single PDF file, writing the result to output_file."""
     ocrmypdf.ocr(
-        input_file=inputFile,
-        output_file=f"app/prozorro_functionality/temp_pdf/page_{num_of_page}_ocred.pdf",
+        input_file=input_file,
+        output_file=output_file,
         language=lang,
-        tesseract_pagesegmode=pagesegmode,
-        tesseract_oem=ocr_engine_mode,
-        force_ocr=force_ocr,
+        tesseract_pagesegmode=3,
+        tesseract_oem=1,
+        force_ocr=True,
         output_type="pdf",
         deskew=True,
         rotate_pages=True,
         pdf_renderer="hocr",
-        #optimize=3,
-        #clean_final=clean_final
     )
-def get_table_from_pdf(path_to_pdf):
-    splited_pdf = get_splited_pdf_by_pages(path_to_pdf)
-    table_list = []
-    first_skip = True
-    for page_num in range(len(splited_pdf)-1, -1, -1):
-        print(page_num)
-        ocr_pdf(f"app/prozorro_functionality/temp_pdf/page_{page_num}.pdf", page_num)
-        tables = camelot.read_pdf(f"app/prozorro_functionality/temp_pdf/page_{page_num}_ocred.pdf", pages="all", split_text=True, strip_text='\n',
-                                  line_scale=15, flavor="lattice")
-        if tables.n == 0 and first_skip == True:
-            first_skip = False
-            continue
-        elif tables.n == 0 and first_skip == False:
-            break
-
-        for table in tables:
-            table_list.append(table.df)
-
-    if not table_list:
-        raise Exception("There are no tables in document!")
 
 
-    return table_list
+def _extract_text_from_page(page_bytes: bytes, page_num: int, work_dir: str) -> str:
+    """Extract text from a single PDF page. Uses fitz text layer first; falls back to OCR."""
+    doc = fitz.open(stream=page_bytes, filetype="pdf")
+    page = doc[0]
+    text = page.get_text()
+    doc.close()
 
-def load_pdf(url):
-    response = requests.get(url)
-    with open('app/prozorro_functionality/temp_pdf/temp_pdf.pdf', 'wb') as file:
-        file.write(response.content)
+    if len(text.strip()) > 100:
+        return text
 
-def find_col_idx(df):
-    last_col = df.columns[-1]
-    df[last_col] = df[last_col].str.replace('|', '').str.replace(' ', '').str.replace(',', '.')
-    df[last_col] = pd.to_numeric(df[last_col], errors='coerce')
-    indices = {'total_price': df.columns.get_loc(last_col)}
-    for col in df.columns[-2::-1]:
-        if df[col].str.contains('%').any():
-            continue
-        df[col] = df[col].str.replace('|', '').str.replace(' ', '').str.replace(',', '.')
-        df[col] = pd.to_numeric(df[col], errors='coerce')
-        indices['unit_price'] = df.columns.get_loc(col)
-        break
+    # Text layer is sparse — run OCR
+    page_path = os.path.join(work_dir, f"page_{page_num}.pdf")
+    ocr_path = os.path.join(work_dir, f"page_{page_num}_ocred.pdf")
 
-    df[indices['unit_price']-1] = df[indices['unit_price']-1].str.replace('|', '').str.replace(' ', '').str.replace(',', '.')
-    df[indices['unit_price']-1] = pd.to_numeric(df[indices['unit_price']-1], errors='coerce')
-    indices['quantity'] = (indices['unit_price']-1)
+    with open(page_path, "wb") as f:
+        f.write(page_bytes)
 
-
-    df[indices['quantity']-1] = df[indices['quantity']-1].str.replace('|', '').astype(str)
-    indices['unit_name'] = (indices['quantity']-1)
-
-
-    for col in df.columns[1:]:
-        if df[col].str.contains(r'^\d{8}-\d$', na=False).any() or df[col].str.contains(r'^\d{7}$', na=False).any():
-            continue
-        indices['name'] = df.columns.get_loc(col)
-        break
-
-    print("Total_price: ", indices['total_price'])
-    print("Name: ", indices['name'])
-    print("Unit_name: ", indices['unit_name'])
-    print("Unit_price: ", indices['unit_price'])
-    print("Quantity: ", indices['quantity'])
+    try:
+        ocr_pdf(page_path, ocr_path)
+        ocr_doc = fitz.open(ocr_path)
+        ocr_text = ocr_doc[0].get_text()
+        ocr_doc.close()
+        return ocr_text if ocr_text.strip() else text
+    except Exception as e:
+        logger.warning(f"OCR failed for page {page_num}: {e}")
+        return text
 
 
-    return df, indices
+async def _extract_text_all_pages(pdf_content: bytes) -> str:
+    """Extract text from all pages of a PDF in parallel (OCR only when needed)."""
+    doc = fitz.open(stream=pdf_content, filetype="pdf")
+
+    # Split into per-page byte buffers in memory
+    page_buffers = []
+    for i in range(len(doc)):
+        single = fitz.open()
+        single.insert_pdf(doc, from_page=i, to_page=i)
+        page_buffers.append(single.tobytes())
+        single.close()
+    doc.close()
+
+    work_dir = tempfile.mkdtemp(prefix="pyman_pdf_")
+    try:
+        tasks = [
+            asyncio.to_thread(_extract_text_from_page, buf, i, work_dir)
+            for i, buf in enumerate(page_buffers)
+        ]
+        results = await asyncio.gather(*tasks)
+        return "\n".join(results)
+    finally:
+        shutil.rmtree(work_dir, ignore_errors=True)
 
 
-def parse_pdf(documents_url):
-    clear_folder("app/prozorro_functionality/temp_pdf")
+async def parse_documents(document_refs: List[tuple]) -> List[Dict[str, Any]]:
+    """Download PDFs/DOCX, extract text, and use LLM to extract items.
 
-    items = []
-    for doc in documents_url:
-        load_pdf(doc)
-        table_list = get_table_from_pdf("app/prozorro_functionality/temp_pdf/temp_pdf.pdf")
-        concat_table = pd.concat(table_list, ignore_index=True)
-        res, indices = find_col_idx(concat_table)
-
-        for index, row in res.iterrows():
-            data = {}
-
-            if index == 0:
+    document_refs: list of (url, doc_type) where doc_type is 'pdf' or 'docx'.
+    """
+    all_text = []
+    for url, doc_type in document_refs:
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            if doc_type == 'pdf':
+                text = await _extract_text_all_pages(response.content)
+            elif doc_type == 'docx':
+                text = extract_text_from_docx(response.content)
+            else:
                 continue
+            if text.strip():
+                all_text.append(text)
+        except Exception as e:
+            logger.error(f"Failed to process {doc_type} from {url}: {e}")
 
-            if str(row[1]).isdigit():
-                continue
+    if not all_text:
+        raise Exception("Could not extract text from any document!")
 
-            data['name'] = row[indices['name']]
-            data['quantity'] = row[indices['quantity']]
-            data['unit_name'] = row[indices['unit_name']]
-            data['unit_price'] = row[indices['unit_price']]
-            data['total_price'] = row[indices['total_price']]
+    combined_text = "\n\n".join(all_text)
+    items = await extract_items_from_text(combined_text)
 
-            if data['quantity'] == None or data['unit_price'] == None or data['unit_name'] == '':
-                break
+    if items is None:
+        raise Exception("LLM failed to extract items from document text")
 
-            items.append(data)
     return items
 
-def validate_name(name, max_elements = 2):
+
+def validate_name(name, max_elements=2):
     items = name.split(",")
 
     if len(items) > max_elements:
@@ -177,9 +161,10 @@ def validate_name(name, max_elements = 2):
 
     return True
 
-def get_contract_info(contract_id):
+
+async def get_contract_info(contract_id):
     contract = get_contract(contract_id)
-    print(contract)
+    logger.info(f"Contract data for {contract_id}: {str(contract)[:200]}")
     if not contract:
         raise HTTPException(status_code=404, detail="Contract not found!")
 
@@ -214,7 +199,7 @@ def get_contract_info(contract_id):
                         break
 
             items.append(data)
-            
+
     if len(items) > 0:
         return items
 
@@ -222,8 +207,8 @@ def get_contract_info(contract_id):
     documents = contract.get('documents', None)
     if documents:
         try:
-            url = get_pdf_url(documents)
-            items = parse_pdf(url)
+            url = get_document_urls(documents)
+            items = await parse_documents(url)
             if len(items) == 0:
                 raise HTTPException(status_code=404, detail="Could not find items in specification!")
         except HTTPException:
@@ -235,11 +220,6 @@ def get_contract_info(contract_id):
 
     return items
 
-# print(get_contract_info("33f405c1a83b4e3b9835e546cb8db51f"))
-
-import io
-import docx
-import pandas as pd
 
 def get_tender_documents(contract_id):
     url = f"{BASE_URL}/tenders/{contract_id}/documents"
@@ -253,14 +233,15 @@ def get_tender_documents(contract_id):
                 title = doc.get('title', '').lower()
                 if (title.endswith('.pdf') or title.endswith('.docx')) and not title.endswith('.p7s'):
                     valid_docs.append(doc)
-        
+
         unique_docs = {}
         for d in valid_docs:
             unique_docs[d.get('title')] = d
         return list(unique_docs.values())
     except Exception as e:
-        print(f"Error getting documents: {e}")
+        logger.warning(f"Error getting documents: {e}")
         return []
+
 
 def extract_text_from_docx(content: bytes) -> str:
     doc = docx.Document(io.BytesIO(content))
@@ -275,30 +256,24 @@ def extract_text_from_docx(content: bytes) -> str:
                     text.append(cell.text.strip())
     return "\n".join(text)
 
+
 def extract_text_from_pdf_extended(content: bytes) -> str:
-    import fitz
-    import os
+    """Extract text from PDF with selective OCR per page. Sync — called via asyncio.to_thread()."""
     doc = fitz.open(stream=content, filetype="pdf")
-    text = "\n".join(page.get_text() for page in doc)
-    
-    if len(text.strip()) > 50:
-        return text
-        
-    path_to_pdf = 'app/prozorro_functionality/temp_pdf/temp_pdf_for_text.pdf'
-    path_to_ocred = 'app/prozorro_functionality/temp_pdf/page_txt_ocred.pdf'
-    
-    with open(path_to_pdf, 'wb') as f:
-        f.write(content)
-        
+    work_dir = tempfile.mkdtemp(prefix="pyman_pdf_ext_")
+
     try:
-        ocr_pdf(path_to_pdf, "txt")
-        doc_ocred = fitz.open(path_to_ocred)
-        ocred_text = "\n".join(page.get_text() for page in doc_ocred)
-        return ocred_text
-    except Exception as e:
-        print(f"OCR Error: {e}")
-        doc_tables = get_table_from_pdf(path_to_pdf)
-        if doc_tables:
-            concat_table = pd.concat(doc_tables, ignore_index=True)
-            return concat_table.to_string()
-        return ""
+        page_texts = []
+        for i in range(len(doc)):
+            # Get per-page bytes
+            single = fitz.open()
+            single.insert_pdf(doc, from_page=i, to_page=i)
+            page_bytes = single.tobytes()
+            single.close()
+
+            page_texts.append(_extract_text_from_page(page_bytes, i, work_dir))
+
+        return "\n".join(page_texts)
+    finally:
+        doc.close()
+        shutil.rmtree(work_dir, ignore_errors=True)

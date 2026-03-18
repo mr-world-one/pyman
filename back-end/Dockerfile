@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-# System deps: Chromium for Selenium, Ghostscript for camelot-py, OCR tools
+# System deps: Chromium for Selenium, OCR tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
     chromium-driver \
@@ -19,9 +19,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xdg-utils \
     wget \
     curl \
-    ghostscript \
-    libgs-dev \
-    poppler-utils \
     tesseract-ocr \
     tesseract-ocr-ukr \
     tesseract-ocr-eng \
@@ -43,10 +40,8 @@ COPY back-end/requirements.txt /tmp/backend-requirements.txt
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r /tmp/backend-requirements.txt
 
-# Install camelot-py (PDF table extraction) + its CV backend + PyMuPDF (fitz) + ocrmypdf
+# Install PyMuPDF (fitz) + ocrmypdf for PDF text extraction and OCR
 RUN pip install --no-cache-dir \
-    "camelot-py[cv]" \
-    opencv-python-headless \
     PyMuPDF \
     ocrmypdf
 
