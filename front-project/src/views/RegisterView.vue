@@ -1,184 +1,119 @@
 <template>
-  <div class="register-page">
-    <div class="register">
-      <h1>Реєстрація користувача</h1>
-      <div v-if="error" class="error-message">
-        {{ error }}
-      </div>
-      <form @submit.prevent="handleRegister" class="registration-form">
-        <div class="form-group">
-          <label for="name">
-            Name <span class="required">*</span>
-          </label>
+  <PageContainer max-width="sm" centered>
+    <CardPanel>
+      <h1 class="form-title">Реєстрація користувача</h1>
+      <div v-if="error" class="alert alert-error">{{ error }}</div>
+      <form @submit.prevent="handleRegister">
+        <FormGroup label="Ім'я" html-for="name" required>
           <input
             type="text"
             id="name"
             v-model="name"
+            class="app-input"
             placeholder="Введіть ім'я"
             required
           />
-        </div>
-        <div class="form-group">
-          <label for="email">
-            Email <span class="required">*</span>
-          </label>
+        </FormGroup>
+        <FormGroup label="Електронна пошта" html-for="email" required>
           <input
             type="email"
             id="email"
             v-model="email"
-            placeholder="Введіть email"
+            class="app-input"
+            placeholder="Введіть електронну пошту"
             required
           />
-        </div>
-        <div class="form-group">
-          <label for="password">
-            Password <span class="required">*</span>
-          </label>
+        </FormGroup>
+        <FormGroup label="Пароль" html-for="password" required>
           <input
             type="password"
             id="password"
             v-model="password"
+            class="app-input"
             placeholder="Введіть пароль"
             required
           />
-        </div>
-        <button type="submit">Зареєструватися!</button>
+        </FormGroup>
+        <AppButton type="submit" :loading="loading" :disabled="loading" size="lg" style="width: 100%">
+          {{ loading ? 'Реєстрація...' : 'Зареєструватися' }}
+        </AppButton>
       </form>
-    </div>
-  </div>
+      <p class="form-footer">
+        Вже маєте акаунт? <router-link to="/signin">Увійдіть!</router-link>
+      </p>
+    </CardPanel>
+  </PageContainer>
 </template>
 
 <script>
 import { ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
+import { useToast } from '@/composables/useToast'
+import PageContainer from '@/components/PageContainer.vue'
+import CardPanel from '@/components/CardPanel.vue'
+import FormGroup from '@/components/FormGroup.vue'
+import AppButton from '@/components/AppButton.vue'
 
 export default {
-  name: 'RegistrationView',
+  name: 'RegisterView',
+  components: { PageContainer, CardPanel, FormGroup, AppButton },
   setup() {
     const router = useRouter()
     const authStore = useAuthStore()
+    const toast = useToast()
     const name = ref('')
     const email = ref('')
     const password = ref('')
     const error = ref('')
+    const loading = ref(false)
 
     const handleRegister = async () => {
+      if (loading.value) return
+      loading.value = true
+
       try {
         error.value = ''
         await authStore.register({
           name: name.value,
           email: email.value,
-          password: password.value
+          password: password.value,
         })
+        toast.success('Реєстрація успішна!')
         router.push('/')
       } catch (err) {
-        console.error('Registration error:', err)
-        error.value = err.response?.data?.detail || 'Registration failed'
+        error.value = err.response?.data?.detail || 'Помилка реєстрації'
+        toast.error(error.value)
+      } finally {
+        loading.value = false
       }
     }
 
-    return { 
-      name,
-      email, 
-      password, 
-      error, 
-      handleRegister 
-    }
-  }
+    return { name, email, password, error, loading, handleRegister }
+  },
 }
 </script>
 
 <style scoped>
-
-.register-page {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding-top: 100px;
-    min-height: 100vh;
-}
-
-.register {
-  max-width: 500px;
-  width: 100%;
-  margin: 0 auto;
-  padding: 30px;
-  background-color: #ffffff;
-  border-radius: 8px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-  font-family: 'Raleway', sans-serif;
-}
-
-.register h1 {
+.form-title {
   text-align: center;
-  margin-bottom: 20px;
-  font-size: 2rem;
-  color: #333;
+  font-size: var(--text-2xl);
+  margin-bottom: var(--space-6);
 }
 
-.registration-form {
-  display: flex;
-  flex-direction: column;
-}
-
-.form-group {
-  margin-bottom: 20px;
-}
-
-.form-group label {
-  font-weight: 600;
-  margin-bottom: 5px;
-  display: block;
-  color: #444;
-}
-
-.required {
-  color: red;
-  margin-left: 4px;
-}
-
-input {
-  width: 100%;
-  padding: 12px 15px;
-  font-size: 1rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
-}
-
-input:focus {
-  border-color: #007bff;
-  outline: none;
-  box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);
-}
-
-button {
-  background: linear-gradient(135deg, #41ec22, #27ac0f);
-  color: white;
-  padding: 0.8rem;
-  font-size: 1.1rem;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.3s;
-}
-
-button:hover {
-  background-color: #0056b3;
-}
-.error-message {
-  color: #dc3545;
-  background-color: #f8d7da;
-  border: 1px solid #f5c6cb;
-  border-radius: 4px;
-  padding: 10px;
-  margin-bottom: 20px;
+.form-footer {
+  margin-top: var(--space-6);
   text-align: center;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
 }
 
-button:disabled {
-  background: #cccccc;
-  cursor: not-allowed;
+.form-footer a {
+  color: var(--color-primary);
+  font-weight: var(--font-semibold);
+}
+
+.form-footer a:hover {
+  text-decoration: underline;
 }
 </style>

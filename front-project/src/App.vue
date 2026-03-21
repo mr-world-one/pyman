@@ -1,304 +1,385 @@
 <script>
-import { computed } from 'vue';
-import { useRouter } from 'vue-router';
-import { useAuthStore } from '@/stores/auth';
-import { ref } from 'vue';
+import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import { useTheme } from '@/composables/useTheme'
+import AppToast from '@/components/AppToast.vue'
 
 export default {
-  name: "App",
+  name: 'App',
+  components: { AppToast },
   setup() {
-    const router = useRouter();
-    const authStore = useAuthStore();
-    const menuOpen = ref(false);
+    const router = useRouter()
+    const authStore = useAuthStore()
+    const menuOpen = ref(false)
+    const { isDark, toggleTheme } = useTheme()
 
-    const isAuthenticated = computed(() => authStore.isAuthenticated);
+    const isAuthenticated = computed(() => authStore.isAuthenticated)
 
     const toggleMenu = () => {
-      menuOpen.value = !menuOpen.value;
-    };
+      menuOpen.value = !menuOpen.value
+    }
+
+    const closeMenu = () => {
+      menuOpen.value = false
+    }
 
     const handleLogout = async () => {
-      authStore.logout();
-      await router.push('/signin');
-    };
+      authStore.logout()
+      closeMenu()
+      await router.push('/signin')
+    }
 
-    return { 
-      menuOpen, 
-      toggleMenu, 
+    return {
+      menuOpen,
+      toggleMenu,
+      closeMenu,
       isAuthenticated,
-      handleLogout 
-    };
-  }
-};
+      handleLogout,
+      isDark,
+      toggleTheme,
+    }
+  },
+}
 </script>
 
 <template>
-  <div id="app">
-    <header>
-      <img src="@/assets/picture.png" alt="Лого" class="picture">
-      <h1 class="logo">
-        <span class="green">check</span> <span class="red">IT</span>
-        <span class="subtitle">Технологія чесності</span>
-      </h1>
-      <div class="menu-container">
-        <button @click="toggleMenu" :class="{ clicked: menuOpen }" class="button">
-          <svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 20 20" fill="none" class="svg-icon">
-            <g stroke-width="1.5" stroke-linecap="round" stroke="#000000">
-              <circle r="2.5" cy="10" cx="10"></circle>
-              <path fill-rule="evenodd" d="m8.39079 2.80235c.53842-1.51424 2.67991-1.51424 3.21831-.00001.3392.95358 1.4284 1.40477 2.3425.97027 1.4514-.68995 2.9657.82427 2.2758 2.27575-.4345.91407.0166 2.00334.9702 2.34248 1.5143.53842 1.5143 2.67996 0 3.21836-.9536.3391-1.4047 1.4284-.9702 2.3425.6899 1.4514-.8244 2.9656-2.2758 2.2757-.9141-.4345-2.0033.0167-2.3425.9703-.5384 1.5142-2.67989.00001-3.21831 0-.33914-.9536-1.4284-1.4048-2.34247-.9703-1.45148.6899-2.96571-.8243-2.27575-2.2757.43449-.9141-.01669-2.0034-.97028-2.3425-1.51422-.5384-1.51422-2.67994.00001-3.21836.95358-.33914 1.40476-1.42841.97027-2.34248-.68996-1.45148.82427-2.9657 2.27575-2.27575.91407.4345 2.00333-.01669 2.34247-.97026z" clip-rule="evenodd"></path>
-            </g>
-          </svg>
-          <span class="lable">Menu</span>
+  <div class="app-layout">
+    <header class="app-header">
+      <div class="app-header__inner">
+        <router-link to="/" class="app-header__logo">
+          <span class="logo-green">check</span><span class="logo-red">IT</span>
+        </router-link>
+
+        <nav class="app-header__nav desktop-nav">
+          <template v-if="isAuthenticated">
+            <router-link to="/excel-page" class="nav-link" active-class="nav-link--active">Excel</router-link>
+            <router-link to="/search-tender" class="nav-link" active-class="nav-link--active">Prozorro</router-link>
+            <router-link to="/xpath" class="nav-link" active-class="nav-link--active">X-Path</router-link>
+          </template>
+        </nav>
+
+        <div class="app-header__actions desktop-nav">
+          <button class="theme-toggle" @click="toggleTheme" :aria-label="isDark ? 'Світла тема' : 'Темна тема'">
+            <span v-if="isDark">☀️</span>
+            <span v-else>🌙</span>
+          </button>
+          <template v-if="isAuthenticated">
+            <button class="nav-link nav-link--logout" @click="handleLogout">Вийти</button>
+          </template>
+          <template v-else>
+            <router-link to="/signin" class="nav-link" active-class="nav-link--active">Увійти</router-link>
+            <router-link to="/register" class="nav-link nav-link--cta" active-class="nav-link--active">Реєстрація</router-link>
+          </template>
+        </div>
+
+        <button class="hamburger" @click="toggleMenu" :aria-expanded="menuOpen" aria-label="Меню">
+          <span class="hamburger__line" :class="{ open: menuOpen }"></span>
+          <span class="hamburger__line" :class="{ open: menuOpen }"></span>
+          <span class="hamburger__line" :class="{ open: menuOpen }"></span>
         </button>
-        <transition name="slide">
-          <div v-if="menuOpen" class="side-menu-overlay" @click="toggleMenu">
-            <div class="side-menu" @click.stop>
-              <ul>
-                <li><router-link to="/" @click="toggleMenu">Головна</router-link></li>
-                <li><router-link to="/about" @click="toggleMenu">Про нас</router-link></li>
-                <li><router-link to="/register" @click="toggleMenu">Реєстрація</router-link></li>
-                <li><router-link to="/signin" @click="toggleMenu">Увійти</router-link></li>
-                <li v-if="isAuthenticated"><router-link to="/xpath" @click="toggleMenu">X-Path</router-link></li>
-                <li v-if="isAuthenticated"><router-link to="/excel-page" @click="toggleMenu">Excel tenders</router-link></li>
-                <li v-if="isAuthenticated"><router-link to="/search-tender" @click="toggleMenu">Prozorro tenders</router-link></li>
-                <li v-if="isAuthenticated"><a href="#" @click.prevent="handleLogout">Вийти</a></li>
-              </ul>
-            </div>
-          </div>
-        </transition>
+        <button class="theme-toggle theme-toggle--mobile" @click="toggleTheme" :aria-label="isDark ? 'Світла тема' : 'Темна тема'">
+          <span v-if="isDark">☀️</span>
+          <span v-else>🌙</span>
+        </button>
       </div>
     </header>
 
-    <main>
-      <router-view></router-view>
+    <transition name="slide">
+      <div v-if="menuOpen" class="side-menu-overlay" @click="closeMenu">
+        <nav class="side-menu" @click.stop>
+          <ul>
+            <li><router-link to="/" @click="closeMenu">Головна</router-link></li>
+            <li><router-link to="/about" @click="closeMenu">Про нас</router-link></li>
+            <template v-if="isAuthenticated">
+              <li><router-link to="/excel-page" @click="closeMenu">Excel</router-link></li>
+              <li><router-link to="/search-tender" @click="closeMenu">Prozorro</router-link></li>
+              <li><router-link to="/xpath" @click="closeMenu">X-Path</router-link></li>
+              <li><a href="#" @click.prevent="handleLogout">Вийти</a></li>
+            </template>
+            <template v-else>
+              <li><router-link to="/signin" @click="closeMenu">Увійти</router-link></li>
+              <li><router-link to="/register" @click="closeMenu">Реєстрація</router-link></li>
+            </template>
+          </ul>
+        </nav>
+      </div>
+    </transition>
+
+    <main class="app-main">
+      <router-view />
     </main>
 
-    <footer>
-      <p>© 2025. All rights are reserved.</p>
+    <footer class="app-footer">
+      <p>&copy; {{ new Date().getFullYear() }} checkIT — Технологія чесності</p>
     </footer>
+
+    <AppToast />
   </div>
 </template>
 
-
-
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500&family=Raleway:wght@300;700&display=swap');
-  @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@700&family=Anton&display=swap');
-
-  body, html {
-    box-sizing: border-box;
-    overflow-x: hidden;
-    height: 100%;
-    background: url('@/assets/upscalemedia-transformed.jpeg') no-repeat center;
-    background-size: cover;
-  }
-
-  #app {
-    max-width: 1280px;
-    margin: auto;
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-  }
-
-  .picture {
-    position: fixed;
-    height: 150px;
-    left: 10px;
-  }
-
-  header {
-    position: fixed;
-    background: #ffffff;
-    width: 100%;
-    right: 1px;
-    box-sizing: border-box;
-    display: flex;
-  }
-
-  .logo {
-    font-family: 'Rubik', sans-serif;
-    flex-grow: 1;
-    text-align: center;
-    font-size: 4rem;
-    margin-top: 0;
-    margin-bottom: 3px;
-    font-family: 'Rubik';
-    font-size: 5rem;
-    font-weight: 700;
-    letter-spacing: 4px;
-    color: #000000;
-    -webkit-text-stroke: 2px #000000;
-    margin-top: 0;
-    margin-bottom: 3px;
-  }
-
-  .green {
-    color: #35f816;
-    text-transform: lowercase;
-  }
-
-  .red {
-    color: #f00808;
-  }
-
-  .subtitle {
-    font-size: 1rem;
-    display: block;
-    font-family: 'Raleway', sans-serif;
-    font-weight: 300;
-    opacity: 0.9;
-    margin-top: 5px;
-    color: black;
-  }
-
-  .menu-container {
-    position: fixed;
-    top: 42px;
-    right: 20px;
-    z-index: 1000;
-  }
-
-  .button {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 6px 12px;
-    gap: 8px;
-    height: 36px;
-    width: 120px;
-    border: none;
-    background: #ffffff;
-    border-radius: 20px;
-    cursor: pointer;
-  }
-
-  .lable {
-    line-height: 20px;
-    font-size: 17px;
-    color: #000000;
-    font-family: 'Rubik', sans-serif;
-    letter-spacing: 1px;
-  }
-
-  .button:hover {
-    background: #ffffff;
-  }
-
-    .button:hover .svg-icon {
-      animation: spin 2s linear infinite;
-    }
-
-  @keyframes spin {
-    0% {
-      transform: rotate(0deg);
-    }
-
-    100% {
-      transform: rotate(360deg);
-    }
-  }
-
-  .fade-enter-active, .fade-leave-active {
-    transition: opacity 0.3s;
-  }
-
-  .fade-enter, .fade-leave-to {
-    opacity: 0;
-  }
-
-  main {
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-
-  footer {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    background: #ffffff;
-    color: #000000;
-    padding: 15px;
-    text-align: center;
-    border-radius: 20px 20px 0 0;
-    box-sizing: border-box;
-    font-family: 'Raleway', sans-serif;
-    font-weight: 700;
-    letter-spacing: 1px;
-    z-index: 1000; 
-  }
-
-
-  .side-menu-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.3);
-    z-index: 1100;
-    display: flex;
-    justify-content: flex-end;
-  }
-
-  .side-menu {
-    width: 250px;
-    height: 100%;
-    background: #aa1108;
-    padding: 20px;
-    box-sizing: border-box;
-    z-index: 1200;
-  }
-
-    .side-menu ul {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-    }
-
-    .side-menu li {
-      margin-bottom: 15px;
-    }
-
-      .side-menu li:last-child {
-        margin-bottom: 0;
-      }
-
-    .side-menu a {
-      color: #ffffff;
-      text-decoration: none;
-      font-size: 1.1rem;
-    }
-
-  .slide-enter-active, .slide-leave-active {
-    transition: transform 0.3s ease;
-  }
-
-  .slide-enter-from, .slide-leave-to {
-    transform: translateX(100%);
-  }
-
-  .slide-enter-to, .slide-leave-from {
-    transform: translateX(0);
-  }
-  .auth-buttons {
+<style scoped>
+.app-layout {
   display: flex;
-  gap: 10px;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* ===== Header ===== */
+.app-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--header-height);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  z-index: 600;
+}
+
+.app-header__inner {
+  max-width: var(--container-max-width);
+  margin: 0 auto;
+  height: 100%;
+  display: flex;
   align-items: center;
+  padding: 0 var(--space-4);
+  gap: var(--space-4);
 }
 
-.auth-link {
-  color: #000000;
+.app-header__logo {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  letter-spacing: 1px;
   text-decoration: none;
-  padding: 5px 10px;
-  border-radius: 5px;
-  transition: background-color 0.3s;
+  flex-shrink: 0;
 }
 
-.auth-link:hover {
-  background-color: rgba(0, 0, 0, 0.1);
+.logo-green {
+  color: var(--color-green-600);
+}
+
+.logo-red {
+  color: var(--color-red-600);
+}
+
+.app-header__nav {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  gap: var(--space-1);
+}
+
+.app-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.nav-link {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast), color var(--transition-fast);
+  background: none;
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.nav-link:hover {
+  background: var(--color-gray-100);
+  color: var(--color-text);
+}
+
+.nav-link--active {
+  background: var(--color-green-100);
+  color: var(--color-green-700);
+}
+
+.nav-link--cta {
+  background: linear-gradient(135deg, var(--color-green-500), var(--color-green-600));
+  color: var(--color-white);
+}
+
+.nav-link--cta:hover {
+  background: linear-gradient(135deg, var(--color-green-600), var(--color-green-700));
+  color: var(--color-white);
+}
+
+.nav-link--logout {
+  color: var(--color-red-600);
+}
+
+.nav-link--logout:hover {
+  background: var(--color-red-100);
+}
+
+/* ===== Theme Toggle ===== */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--color-gray-100);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.theme-toggle:hover {
+  background: var(--color-gray-200);
+  border-color: var(--color-border-hover);
+}
+
+.theme-toggle--mobile {
+  display: none;
+}
+
+/* ===== Hamburger ===== */
+.hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  padding: var(--space-2);
+  cursor: pointer;
+}
+
+.hamburger__line {
+  display: block;
+  width: 24px;
+  height: 2px;
+  background: var(--color-gray-700);
+  border-radius: 2px;
+  transition: transform var(--transition-base), opacity var(--transition-base);
+}
+
+.hamburger__line.open:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.hamburger__line.open:nth-child(2) {
+  opacity: 0;
+}
+
+.hamburger__line.open:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+/* ===== Side Menu ===== */
+.side-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 800;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.side-menu {
+  width: 260px;
+  height: 100%;
+  background: var(--color-red-600);
+  padding: var(--space-16) var(--space-6) var(--space-6);
+}
+
+.side-menu ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.side-menu li {
+  margin-bottom: var(--space-3);
+}
+
+.side-menu a {
+  color: var(--color-white);
+  text-decoration: none;
+  font-size: var(--text-lg);
+  font-weight: var(--font-medium);
+  padding: var(--space-2) var(--space-3);
+  display: block;
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+
+.side-menu a:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: var(--color-white);
+}
+
+.slide-enter-active,
+.slide-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.slide-enter-active .side-menu,
+.slide-leave-active .side-menu {
+  transition: transform 0.3s ease;
+}
+
+.slide-enter-from {
+  opacity: 0;
+}
+
+.slide-enter-from .side-menu {
+  transform: translateX(100%);
+}
+
+.slide-leave-to {
+  opacity: 0;
+}
+
+.slide-leave-to .side-menu {
+  transform: translateX(100%);
+}
+
+/* ===== Main ===== */
+.app-main {
+  flex: 1;
+}
+
+/* ===== Footer ===== */
+.app-footer {
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+  padding: var(--space-3) var(--space-4);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+  .desktop-nav {
+    display: none;
+  }
+
+  .hamburger {
+    display: flex;
+  }
+
+  .theme-toggle--mobile {
+    display: flex;
+  }
+
+  .app-header__logo {
+    flex: 1;
+  }
 }
 </style>

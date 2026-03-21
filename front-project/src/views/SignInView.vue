@@ -1,178 +1,101 @@
 <template>
-  <div class="signin-page">
-    <div class="signin">
-      <h1>Увійдіть у свій акаунт</h1>
-      <div v-if="error" class="error-message">{{ error }}</div>
-      <form class="signin-form" @submit.prevent="handleLogin">
-        <div class="form-group">
-          <label for="email">Електронна пошта<span class="required">*</span></label>
-          <input type="email" id="email" v-model="email" placeholder="Введіть вашу електронну пошту" required />
-        </div>
-        <div class="form-group">
-          <label for="password">Пароль<span class="required">*</span></label>
-          <input type="password" id="password" v-model="password" placeholder="Введіть ваш пароль" required />
-        </div>
-        <button type="submit" :disabled="loading" @click="console.log('Button clicked')">
+  <PageContainer max-width="sm" centered>
+    <CardPanel>
+      <h1 class="form-title">Увійдіть у свій акаунт</h1>
+      <div v-if="error" class="alert alert-error">{{ error }}</div>
+      <form @submit.prevent="handleLogin">
+        <FormGroup label="Електронна пошта" html-for="email" required>
+          <input
+            type="email"
+            id="email"
+            v-model="email"
+            class="app-input"
+            placeholder="Введіть вашу електронну пошту"
+            required
+          />
+        </FormGroup>
+        <FormGroup label="Пароль" html-for="password" required>
+          <input
+            type="password"
+            id="password"
+            v-model="password"
+            class="app-input"
+            placeholder="Введіть ваш пароль"
+            required
+          />
+        </FormGroup>
+        <AppButton type="submit" :loading="loading" :disabled="loading" size="lg" style="width: 100%">
           {{ loading ? 'Вхід...' : 'Увійти' }}
-        </button>
+        </AppButton>
       </form>
-      <p class="register-link">
+      <p class="form-footer">
         Ще не зареєстровані? <router-link to="/register">Зареєструйтеся!</router-link>
       </p>
-    </div>
-  </div>
+    </CardPanel>
+  </PageContainer>
 </template>
 
 <script>
-  import { ref } from 'vue';
-  import { useAuthStore } from '@/stores/auth';
-  import { useRouter } from 'vue-router';
+import { ref } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+import { useRouter } from 'vue-router'
+import PageContainer from '@/components/PageContainer.vue'
+import CardPanel from '@/components/CardPanel.vue'
+import FormGroup from '@/components/FormGroup.vue'
+import AppButton from '@/components/AppButton.vue'
 
-  export default {
-    name: 'SignIn',
-    setup() {
-      const router = useRouter();
-      const authStore = useAuthStore();
-      const email = ref('');
-      const password = ref('');
-      const error = ref('');
-      const loading = ref(false);
+export default {
+  name: 'SignIn',
+  components: { PageContainer, CardPanel, FormGroup, AppButton },
+  setup() {
+    const router = useRouter()
+    const authStore = useAuthStore()
+    const email = ref('')
+    const password = ref('')
+    const error = ref('')
+    const loading = ref(false)
 
-      const handleLogin = async () => {
-        if (loading.value) return;
-        loading.value = true;
+    const handleLogin = async () => {
+      if (loading.value) return
+      loading.value = true
 
-        try {
-          error.value = '';
-          await authStore.login(email.value, password.value);
-          router.push('/');
-        } catch (err) {
-          console.error('Помилка входу:', err);
-          error.value = err.response?.data?.detail || err.message || 'Помилка входу. Перевірте email або пароль';
-        } finally {
-          loading.value = false;
-        }
-      };
-
-      return {
-        email,
-        password,
-        error,
-        loading,
-        handleLogin
-      };
+      try {
+        error.value = ''
+        await authStore.login(email.value, password.value)
+        router.push('/')
+      } catch (err) {
+        error.value =
+          err.response?.data?.detail || err.message || 'Помилка входу. Перевірте email або пароль'
+      } finally {
+        loading.value = false
+      }
     }
-  };
+
+    return { email, password, error, loading, handleLogin }
+  },
+}
 </script>
 
 <style scoped>
-  @import url('https://fonts.googleapis.com/css2?family=Raleway:wght@300;600;700&display=swap');
+.form-title {
+  text-align: center;
+  font-size: var(--text-2xl);
+  margin-bottom: var(--space-6);
+}
 
-  .signin-page {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding-top: 100px;
-    min-height: 100vh;
-  }
+.form-footer {
+  margin-top: var(--space-6);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
 
-  .signin {
-    max-width: 500px;
-    width: 100%;
-    margin: 0 auto;
-    padding: 30px;
-    background-color: #ffffff;
-    border-radius: 8px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-    font-family: 'Raleway', sans-serif;
-  }
+.form-footer a {
+  color: var(--color-primary);
+  font-weight: var(--font-semibold);
+}
 
-    .signin h1 {
-      text-align: center;
-      margin-bottom: 20px;
-      font-size: 2rem;
-      color: #333;
-    }
-
-  .signin-form {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .form-group {
-    margin-bottom: 20px;
-  }
-
-    .form-group label {
-      font-weight: 600;
-      margin-bottom: 5px;
-      display: block;
-      color: #444;
-    }
-
-  .required {
-    color: red;
-    margin-left: 4px;
-  }
-
-  input {
-    width: 100%;
-    padding: 12px 15px;
-    font-size: 1rem;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    transition: border-color 0.3s ease, box-shadow 0.3s ease;
-  }
-
-    input:focus {
-      border-color: #007bff;
-      outline: none;
-      box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);
-    }
-
-  button {
-    background: linear-gradient(135deg, #41ec22, #27ac0f);
-    color: white;
-    padding: 0.8rem;
-    font-size: 1.1rem;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.3s;
-  }
-
-    button:hover:not(:disabled) {
-      background-color: #0056b3;
-    }
-
-    button:disabled {
-      background: #cccccc;
-      cursor: not-allowed;
-    }
-
-  .error-message {
-    color: #dc3545;
-    background-color: #f8d7da;
-    border: 1px solid #f5c6cb;
-    border-radius: 4px;
-    padding: 10px;
-    margin-bottom: 20px;
-    text-align: center;
-  }
-
-  .register-link {
-    margin-top: 1.5rem;
-    font-size: 1rem;
-    text-align: center;
-  }
-
-    .register-link a {
-      color: #41ec22;
-      text-decoration: none;
-      font-weight: bold;
-    }
-
-      .register-link a:hover {
-        text-decoration: underline;
-      }
+.form-footer a:hover {
+  text-decoration: underline;
+}
 </style>

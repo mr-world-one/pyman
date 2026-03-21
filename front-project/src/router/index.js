@@ -1,9 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 
-
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
+  scrollBehavior() {
+    return { top: 0 }
+  },
   routes: [
     {
       path: '/',
@@ -19,6 +21,13 @@ const router = createRouter({
       path: '/register',
       name: 'register',
       component: () => import('../views/RegisterView.vue'),
+      meta: { guestOnly: true },
+    },
+    {
+      path: '/signin',
+      name: 'SignIn',
+      component: () => import('@/views/SignInView.vue'),
+      meta: { guestOnly: true },
     },
     {
       path: '/xpath',
@@ -26,38 +35,33 @@ const router = createRouter({
       component: () => import('@/views/XPathView.vue'),
       meta: { requiresAuth: true },
     },
-
-    {
-      path: '/signin',
-      name: 'SignIn',
-      component: () => import('@/views/SignInView.vue') 
-    },
-
     {
       path: '/excel-page',
       name: 'ExcelUpload',
       component: () => import('@/views/PrivateView.vue'),
       meta: { requiresAuth: true },
     },
-
     {
       path: '/search-tender',
       name: 'Prozorro',
       component: () => import('@/views/ProzorroView.vue'),
       meta: { requiresAuth: true },
-    }
-  ], 
-    
+    },
+  ],
 })
 
-
-// Navigation guard — uses localStorage directly to avoid circular pinia import
 router.beforeEach((to, from, next) => {
   const isAuthenticated = !!localStorage.getItem('token')
 
   if (to.meta.requiresAuth && !isAuthenticated) {
     return next('/signin')
   }
+
+  if (to.meta.guestOnly && isAuthenticated) {
+    return next('/')
+  }
+
   next()
 })
+
 export default router
