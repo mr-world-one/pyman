@@ -21,7 +21,7 @@ if config.config_file_name is not None:
 # Import all models so Alembic sees them
 from app.database import Base
 from app.models.model import User, Store, ProductXpath, NavigationXpath, WebsiteConfig
-from app.models.tender import Tender, TenderItem
+from app.models.tender import Tender, TenderItem, PriceHistory
 
 target_metadata = Base.metadata
 

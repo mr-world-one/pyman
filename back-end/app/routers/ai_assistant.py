@@ -1,6 +1,8 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+import logging
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, HTTPException, status, Depends, Query
 from pydantic import BaseModel
-from typing import Optional
 import os
 import requests
 from datetime import datetime
@@ -8,6 +10,9 @@ from app.database import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.models.model import User
+from app.models.tender import Tender, TenderItem
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/assistant", tags=["Assistant"])
 
@@ -23,6 +28,8 @@ class AssistantResponse(BaseModel):
     status: str
     response: Optional[str] = None
     timestamp: str
+    risk_score: Optional[int] = None
+    risk_details: Optional[Dict[str, Any]] = None
 
 def query_huggingface_api(message: str) -> str:
     """
@@ -137,3 +144,87 @@ async def perform_task(request: AssistantRequest, db: AsyncSession = Depends(get
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Помилка сервера: {str(e)}"
         )
+
+
+@router.post("/analyze-risks")
+async def analyze_risks(
+    tender_id: int = Query(..., description="ID тендера для аналізу ризиків"),
+    stores: str = Query(default="rozetka,silpo,epicentr", description="Магазини для порівняння цін"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Analyze corruption risks for a tender: price deviations + discriminatory requirements."""
+    from app.routers.authorization import get_current_user
+    from app.services.risk_analyzer import (
+        calculate_price_deviation,
+        analyze_discriminatory_requirements,
+        calculate_overall_risk_score,
+    )
+    from app.services.parser_service import search_and_validate_items
+    from app.prozorro_functionality.prozorro import get_contract, get_document_urls, parse_documents
+
+    # Fetch tender
+    result = await db.execute(select(Tender).where(Tender.id == tender_id))
+    tender = result.scalar_one_or_none()
+    if not tender:
+        raise HTTPException(status_code=404, detail="Тендер не знайдено")
+
+    store_list = [s.strip() for s in stores.split(",") if s.strip()]
+
+    # Convert items to dicts
+    items_for_search = [
+        {
+            "name": item.name,
+            "quantity": item.quantity,
+            "unit_name": item.unit_name,
+            "unit_price": item.unit_price,
+        }
+        for item in tender.items
+    ]
+
+    # 1. Price comparison
+    try:
+        matched_items = await search_and_validate_items(
+            items=items_for_search,
+            stores=store_list,
+            n=3,
+        )
+        price_risks = calculate_price_deviation(items_for_search, matched_items)
+    except Exception as e:
+        logger.error(f"Price comparison failed for tender #{tender_id}: {e}")
+        price_risks = []
+        matched_items = []
+
+    # 2. Discriminatory requirements analysis
+    discrim_analysis = None
+    if tender.prozorro_id:
+        try:
+            hex_id = tender.prozorro_id
+            if hex_id.upper().startswith("UA-"):
+                from app.routers.prozorro_router import convert_ua_to_hex_id
+                hex_id = await convert_ua_to_hex_id(hex_id.upper())
+
+            contract = get_contract(hex_id)
+            documents = contract.get("documents", []) if contract else []
+            if documents:
+                doc_refs = get_document_urls(documents)
+                items_from_docs = await parse_documents(doc_refs)
+                # Combine all text from items for analysis
+                spec_text = " ".join(
+                    str(item.get("name", "")) + " " + str(item.get("specifications", ""))
+                    for item in items_from_docs
+                )
+                if spec_text.strip():
+                    discrim_analysis = await analyze_discriminatory_requirements(spec_text)
+        except Exception as e:
+            logger.warning(f"Discriminatory analysis failed for tender #{tender_id}: {e}")
+
+    # 3. Overall risk score
+    risk_result = calculate_overall_risk_score(price_risks, discrim_analysis)
+
+    return AssistantResponse(
+        status="success",
+        response=f"Аналіз ризиків для тендера '{tender.title}' завершено. Рівень ризику: {risk_result['risk_level']}",
+        timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        risk_score=risk_result["risk_score"],
+        risk_details=risk_result,
+    )

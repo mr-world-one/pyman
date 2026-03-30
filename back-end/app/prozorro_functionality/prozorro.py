@@ -67,10 +67,64 @@ def ocr_pdf(input_file: str, output_file: str, lang: str = "ukr+eng"):
     )
 
 
+def _is_scanned_page(page) -> bool:
+    """Determine if a PDF page is a scanned image (needs OCR) vs text-based.
+
+    Uses fitz block analysis: if text blocks cover >5% of the page area,
+    the page has a usable text layer and OCR can be skipped.
+    """
+    page_area = page.rect.width * page.rect.height
+    if page_area <= 0:
+        return True
+
+    blocks = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)["blocks"]
+
+    text_area = 0
+    image_area = 0
+
+    for block in blocks:
+        bx0 = block.get("bbox", (0, 0, 0, 0))
+        block_area = abs((bx0[2] - bx0[0]) * (bx0[3] - bx0[1]))
+
+        if block.get("type") == 0:  # text block
+            # Check if the block actually has meaningful text
+            has_text = False
+            for line in block.get("lines", []):
+                for span in line.get("spans", []):
+                    if span.get("text", "").strip():
+                        has_text = True
+                        break
+                if has_text:
+                    break
+            if has_text:
+                text_area += block_area
+        elif block.get("type") == 1:  # image block
+            image_area += block_area
+
+    text_coverage = text_area / page_area
+
+    # If text blocks cover more than 5% of the page, it's a text PDF
+    if text_coverage > 0.05:
+        return False
+
+    # If the page is mostly images, it's likely a scan
+    return True
+
+
 def _extract_text_from_page(page_bytes: bytes, page_num: int, work_dir: str) -> str:
-    """Extract text from a single PDF page. Uses fitz text layer first; falls back to OCR."""
+    """Extract text from a single PDF page. Uses smart detection to skip OCR for text PDFs."""
     doc = fitz.open(stream=page_bytes, filetype="pdf")
     page = doc[0]
+
+    # Smart detection: check if page has enough text blocks
+    if not _is_scanned_page(page):
+        text = page.get_text()
+        doc.close()
+        if len(text.strip()) > 50:
+            logger.info(f"Page {page_num}: text-based PDF, OCR skipped ({len(text)} chars)")
+            return text
+
+    # Fallback: try basic text extraction
     text = page.get_text()
     doc.close()
 
@@ -78,6 +132,7 @@ def _extract_text_from_page(page_bytes: bytes, page_num: int, work_dir: str) -> 
         return text
 
     # Text layer is sparse — run OCR
+    logger.info(f"Page {page_num}: scanned page detected, running OCR")
     page_path = os.path.join(work_dir, f"page_{page_num}.pdf")
     ocr_path = os.path.join(work_dir, f"page_{page_num}_ocred.pdf")
 

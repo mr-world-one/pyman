@@ -115,6 +115,34 @@ export const useTendersStore = defineStore('tenders', () => {
     }
   }
 
+  async function fetchPriceHistory(id, days = 30) {
+    try {
+      const { data } = await apiClient.get(`/tenders/${id}/price-history`, {
+        params: { days },
+      })
+      return data
+    } catch (err) {
+      error.value = err.response?.data?.detail || err.message || 'Помилка завантаження історії цін'
+      return null
+    }
+  }
+
+  async function analyzeRisks(tenderId, stores = ['rozetka', 'silpo', 'epicentr']) {
+    loading.value = true
+    error.value = null
+    try {
+      const { data } = await apiClient.post('/assistant/analyze-risks', null, {
+        params: { tender_id: tenderId, stores: stores.join(',') },
+      })
+      return data
+    } catch (err) {
+      error.value = err.response?.data?.detail || err.message || 'Помилка аналізу ризиків'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   function setFilter(key, value) {
     filters.value[key] = value
     filters.value.page = 1
@@ -142,6 +170,8 @@ export const useTendersStore = defineStore('tenders', () => {
     importFromProzorro,
     deleteTender,
     analyzeTender,
+    fetchPriceHistory,
+    analyzeRisks,
     setFilter,
     nextPage,
     prevPage,

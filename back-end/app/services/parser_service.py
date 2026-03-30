@@ -339,3 +339,44 @@ def get_available_stores() -> List[Dict[str, str]]:
         {"key": key, "name": info["name"], "url": info["url"]}
         for key, info in AVAILABLE_PARSERS.items()
     ]
+
+
+async def save_price_history(
+    item_id: int,
+    matches: List[Dict[str, Any]],
+) -> None:
+    """Save validated store prices to PriceHistory for tracking over time.
+
+    Called after successful scraping + LLM validation for a tender item.
+    Only saves prices for relevant matches.
+    """
+    from app.database import SessionLocal
+    from app.models.tender import PriceHistory
+
+    if not matches or not item_id:
+        return
+
+    try:
+        async with SessionLocal() as session:
+            for match in matches:
+                effective_price = match.get("price_on_sale") or match.get("price")
+                if effective_price is None:
+                    continue
+                try:
+                    price_val = float(effective_price)
+                except (ValueError, TypeError):
+                    continue
+
+                entry = PriceHistory(
+                    item_id=item_id,
+                    price=price_val,
+                    source_store=match.get("store_name", match.get("store", "unknown")),
+                    product_title=match.get("title", "")[:500],
+                    product_url=match.get("url", "")[:1000] if match.get("url") else None,
+                )
+                session.add(entry)
+
+            await session.commit()
+            logger.info(f"Saved {len(matches)} price history entries for item #{item_id}")
+    except Exception as e:
+        logger.warning(f"Failed to save price history for item #{item_id}: {e}")

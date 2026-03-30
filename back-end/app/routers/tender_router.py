@@ -31,7 +31,7 @@ from app.schemas.tender import (
     ServiceTenderCreate,
     WorkTenderCreate,
 )
-from app.services.tender_classifier import classify_tender_type
+from app.services.tender_classifier import classify_tender_type, classify_tender_type_async
 
 logger = logging.getLogger(__name__)
 
@@ -250,8 +250,8 @@ async def import_from_prozorro(
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Помилка отримання даних: {str(e)}")
 
-    # Classify type
-    tender_type = classify_tender_type(raw_items)
+    # Classify type using LLM (async)
+    tender_type = await classify_tender_type_async(raw_items)
 
     # Calculate total
     total_amount = sum(
@@ -358,6 +358,12 @@ async def analyze_tender(
             n=3,
         )
 
+        # Save price history for tracking
+        from app.services.parser_service import save_price_history
+        for i, group in enumerate(matched_items):
+            if i < len(tender.items) and group.get("matches"):
+                await save_price_history(tender.items[i].id, group["matches"])
+
         return {
             "status": "success",
             "message": "Аналіз завершено",
@@ -370,3 +376,67 @@ async def analyze_tender(
     except Exception as e:
         logger.error(f"Analyze tender #{tender_id} error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── PRICE HISTORY ────────────────────────────────────────────────
+
+@tender_router.get("/{tender_id}/price-history")
+async def get_price_history(
+    tender_id: int,
+    days: int = Query(default=30, ge=1, le=365, description="Number of days to look back"),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Get price history for all items in a tender."""
+    from datetime import datetime, timedelta
+    from app.models.tender import PriceHistory
+
+    user_id = current_user.id if hasattr(current_user, "id") else 1
+    result = await db.execute(
+        select(Tender).where(Tender.id == tender_id, Tender.user_id == user_id)
+    )
+    tender = result.scalar_one_or_none()
+    if not tender:
+        raise HTTPException(status_code=404, detail="Тендер не знайдено")
+
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    item_ids = [item.id for item in tender.items]
+
+    if not item_ids:
+        return {"tender_id": tender_id, "items": []}
+
+    history_result = await db.execute(
+        select(PriceHistory)
+        .where(PriceHistory.item_id.in_(item_ids), PriceHistory.created_at >= cutoff)
+        .order_by(PriceHistory.created_at.asc())
+    )
+    history_entries = history_result.scalars().all()
+
+    # Group by item
+    items_history = {}
+    for entry in history_entries:
+        if entry.item_id not in items_history:
+            # Find item name
+            item_name = next(
+                (item.name for item in tender.items if item.id == entry.item_id), ""
+            )
+            items_history[entry.item_id] = {
+                "item_id": entry.item_id,
+                "item_name": item_name,
+                "tender_price": next(
+                    (item.unit_price for item in tender.items if item.id == entry.item_id), 0
+                ),
+                "history": [],
+            }
+        items_history[entry.item_id]["history"].append({
+            "price": entry.price,
+            "source_store": entry.source_store,
+            "product_title": entry.product_title,
+            "date": entry.created_at.isoformat() if entry.created_at else None,
+        })
+
+    return {
+        "tender_id": tender_id,
+        "days": days,
+        "items": list(items_history.values()),
+    }

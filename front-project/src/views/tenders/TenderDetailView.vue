@@ -11,6 +11,9 @@
           <AppButton v-if="tender.tender_type !== 'service'" variant="ghost" @click="showAnalysis = true" :disabled="analyzing">
             {{ analyzing ? 'Аналізуємо...' : 'Аналіз цін' }}
           </AppButton>
+          <AppButton variant="ghost" @click="runRiskAnalysis" :disabled="analyzingRisks">
+            {{ analyzingRisks ? 'Перевіряємо...' : 'Аналіз ризиків' }}
+          </AppButton>
           <AppButton variant="danger" size="sm" @click="handleDelete">Видалити</AppButton>
         </div>
       </div>
@@ -39,16 +42,36 @@
           <div class="summary-label">Позицій</div>
           <div class="summary-value">{{ tender.items.length }}</div>
         </div>
+        <div class="summary-card" v-if="riskResult">
+          <div class="summary-label">Рівень ризику</div>
+          <div class="summary-value" :class="'risk-' + riskResult.risk_level">
+            {{ riskResult.risk_score }}/100
+          </div>
+        </div>
       </div>
 
-      <div class="items-section">
+      <!-- Tabs -->
+      <div class="tabs">
+        <button
+          v-for="tab in tabs"
+          :key="tab.key"
+          class="tab-btn"
+          :class="{ active: activeTab === tab.key }"
+          @click="activeTab = tab.key"
+        >
+          {{ tab.label }}
+        </button>
+      </div>
+
+      <!-- Tab: Items -->
+      <div v-if="activeTab === 'items'" class="items-section">
         <ProductTenderDetail v-if="tender.tender_type === 'product'" :items="tender.items" />
         <ServiceTenderDetail v-if="tender.tender_type === 'service'" :items="tender.items" />
         <WorkTenderDetail v-if="tender.tender_type === 'work'" :items="tender.items" />
       </div>
 
-      <!-- Analysis results -->
-      <div v-if="analysisResults" class="analysis-section">
+      <!-- Tab: Price Analysis results -->
+      <div v-if="activeTab === 'prices' && analysisResults" class="analysis-section">
         <h2>Результати аналізу цін</h2>
         <div v-for="group in processedAnalysis" :key="group.name" class="product-group">
           <div class="product-header">
@@ -84,6 +107,87 @@
             </tbody>
           </table>
           <div v-else class="no-matches">Не знайдено в магазинах</div>
+        </div>
+      </div>
+      <div v-if="activeTab === 'prices' && !analysisResults" class="tab-empty">
+        <p>Натисніть "Аналіз цін", щоб запустити порівняння з магазинами</p>
+      </div>
+
+      <!-- Tab: Price Analytics (Charts) -->
+      <div v-if="activeTab === 'analytics'" class="analytics-section">
+        <h2>Аналітика цін</h2>
+        <div class="analytics-controls">
+          <label>
+            Період:
+            <select v-model="historyDays" @change="loadPriceHistory">
+              <option :value="7">7 днів</option>
+              <option :value="30">30 днів</option>
+              <option :value="90">90 днів</option>
+            </select>
+          </label>
+        </div>
+        <PriceTrendChart
+          :tender-id="tender.id"
+          :price-history="priceHistory"
+          :loading="loadingHistory"
+        />
+      </div>
+
+      <!-- Tab: Risk Analysis -->
+      <div v-if="activeTab === 'risks'" class="risk-section">
+        <h2>Аналіз корупційних ризиків</h2>
+        <div v-if="riskResult" class="risk-results">
+          <div class="risk-score-card" :class="'risk-' + riskResult.risk_level">
+            <div class="risk-score-number">{{ riskResult.risk_score }}</div>
+            <div class="risk-score-label">/ 100</div>
+            <div class="risk-level-text">
+              {{ riskResult.risk_level === 'high' ? 'Високий ризик' : riskResult.risk_level === 'medium' ? 'Середній ризик' : 'Низький ризик' }}
+            </div>
+          </div>
+
+          <div class="risk-breakdown">
+            <div class="risk-breakdown-item">
+              <span class="breakdown-label">Цінові відхилення:</span>
+              <span class="breakdown-value">{{ riskResult.price_risk_score }}/50</span>
+            </div>
+            <div class="risk-breakdown-item">
+              <span class="breakdown-label">Дискримінаційні вимоги:</span>
+              <span class="breakdown-value">{{ riskResult.discriminatory_risk_score }}/50</span>
+            </div>
+          </div>
+
+          <!-- Price deviations -->
+          <div v-if="riskResult.breakdown?.price_deviations?.length" class="risk-detail-section">
+            <h3>Цінові відхилення</h3>
+            <div v-for="(pd, idx) in riskResult.breakdown.price_deviations" :key="'pd-' + idx" class="risk-finding">
+              <div class="finding-header">
+                <span class="finding-name">{{ pd.item_name }}</span>
+                <span class="risk-badge" :class="'risk-' + pd.risk_level">{{ pd.risk_level }}</span>
+              </div>
+              <div class="finding-details">
+                <span v-if="pd.tender_price">Тендер: {{ formatPrice(pd.tender_price) }} грн</span>
+                <span v-if="pd.median_market_price"> | Ринок: {{ formatPrice(pd.median_market_price) }} грн</span>
+                <span v-if="pd.deviation_pct != null"> | Відхилення: {{ pd.deviation_pct }}%</span>
+              </div>
+              <div class="finding-reason">{{ pd.reason }}</div>
+            </div>
+          </div>
+
+          <!-- Discriminatory requirements -->
+          <div v-if="riskResult.breakdown?.discriminatory_analysis?.discriminatory_requirements?.length" class="risk-detail-section">
+            <h3>Дискримінаційні вимоги</h3>
+            <div v-for="(dr, idx) in riskResult.breakdown.discriminatory_analysis.discriminatory_requirements" :key="'dr-' + idx" class="risk-finding">
+              <div class="finding-header">
+                <span class="risk-badge" :class="'risk-' + dr.severity">{{ dr.severity }}</span>
+                <span class="finding-type">{{ dr.type }}</span>
+              </div>
+              <blockquote class="finding-quote">{{ dr.text }}</blockquote>
+              <div class="finding-reason">{{ dr.explanation }}</div>
+            </div>
+          </div>
+        </div>
+        <div v-else class="tab-empty">
+          <p>Натисніть "Аналіз ризиків", щоб запустити перевірку</p>
         </div>
       </div>
 
@@ -122,12 +226,14 @@ import TenderTypeBadge from '@/components/tenders/TenderTypeBadge.vue'
 import ProductTenderDetail from '@/components/tenders/details/ProductTenderDetail.vue'
 import ServiceTenderDetail from '@/components/tenders/details/ServiceTenderDetail.vue'
 import WorkTenderDetail from '@/components/tenders/details/WorkTenderDetail.vue'
+import PriceTrendChart from '@/components/tenders/PriceTrendChart.vue'
 
 export default {
   name: 'TenderDetailView',
   components: {
     AppButton, AppLoader, StoreSelector, TenderTypeBadge,
     ProductTenderDetail, ServiceTenderDetail, WorkTenderDetail,
+    PriceTrendChart,
   },
   setup() {
     const route = useRoute()
@@ -145,6 +251,24 @@ export default {
       { key: 'epicentr', name: 'Епіцентр' },
       { key: 'citadel', name: 'Citadel' },
     ]
+
+    // Tabs
+    const activeTab = ref('items')
+    const tabs = [
+      { key: 'items', label: 'Позиції' },
+      { key: 'prices', label: 'Порівняння цін' },
+      { key: 'analytics', label: 'Аналітика цін' },
+      { key: 'risks', label: 'Ризики' },
+    ]
+
+    // Price history
+    const priceHistory = ref(null)
+    const loadingHistory = ref(false)
+    const historyDays = ref(30)
+
+    // Risk analysis
+    const riskResult = ref(null)
+    const analyzingRisks = ref(false)
 
     onMounted(() => {
       store.fetchTender(Number(route.params.id))
@@ -177,10 +301,40 @@ export default {
       try {
         const result = await store.analyzeTender(Number(route.params.id), selectedStores.value)
         analysisResults.value = result
+        activeTab.value = 'prices'
+        // Also load price history after analysis
+        loadPriceHistory()
       } catch {
         // error is handled by store
       } finally {
         analyzing.value = false
+      }
+    }
+
+    const loadPriceHistory = async () => {
+      loadingHistory.value = true
+      try {
+        const data = await store.fetchPriceHistory(Number(route.params.id), historyDays.value)
+        priceHistory.value = data
+      } catch {
+        // error is handled by store
+      } finally {
+        loadingHistory.value = false
+      }
+    }
+
+    const runRiskAnalysis = async () => {
+      analyzingRisks.value = true
+      try {
+        const result = await store.analyzeRisks(Number(route.params.id), selectedStores.value)
+        if (result?.risk_details) {
+          riskResult.value = result.risk_details
+        }
+        activeTab.value = 'risks'
+      } catch {
+        // error is handled by store
+      } finally {
+        analyzingRisks.value = false
       }
     }
 
@@ -206,7 +360,9 @@ export default {
 
     return {
       store, tender, showAnalysis, analyzing, analysisResults, selectedStores,
-      availableStores, processedAnalysis,
+      availableStores, processedAnalysis, activeTab, tabs,
+      priceHistory, loadingHistory, historyDays, loadPriceHistory,
+      riskResult, analyzingRisks, runRiskAnalysis,
       runAnalysis, handleDelete, formatPrice, formatDate,
     }
   },
@@ -298,6 +454,204 @@ export default {
 
 .items-section {
   margin-bottom: var(--space-8);
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--color-border);
+  margin-bottom: var(--space-6);
+}
+
+.tab-btn {
+  padding: var(--space-2) var(--space-4);
+  border: none;
+  background: none;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.2s;
+}
+
+.tab-btn:hover {
+  color: var(--color-heading);
+}
+
+.tab-btn.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.tab-empty {
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+/* Analytics */
+.analytics-section h2, .risk-section h2 {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  color: var(--color-heading);
+  margin-bottom: var(--space-4);
+}
+
+.analytics-controls {
+  margin-bottom: var(--space-4);
+}
+
+.analytics-controls select {
+  padding: 0.3rem 0.5rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  font-size: var(--text-sm);
+}
+
+/* Risk analysis */
+.risk-score-card {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-4);
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+}
+
+.risk-score-card.risk-high {
+  border-color: var(--color-danger);
+  background: var(--color-danger-light);
+}
+
+.risk-score-card.risk-medium {
+  border-color: var(--color-warning);
+  background: var(--color-warning-bg);
+}
+
+.risk-score-card.risk-low {
+  border-color: var(--color-success);
+  background: var(--color-green-50);
+}
+
+.risk-score-number {
+  font-size: 3rem;
+  font-weight: var(--font-bold);
+  line-height: 1;
+}
+
+.risk-score-label {
+  font-size: var(--text-lg);
+  color: var(--color-text-secondary);
+}
+
+.risk-level-text {
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  margin-left: auto;
+}
+
+.risk-breakdown {
+  display: flex;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.risk-breakdown-item {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  flex: 1;
+}
+
+.breakdown-label {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.breakdown-value {
+  font-weight: var(--font-bold);
+  margin-left: var(--space-2);
+}
+
+.risk-detail-section {
+  margin-top: var(--space-6);
+}
+
+.risk-detail-section h3 {
+  font-size: var(--text-lg);
+  font-weight: var(--font-bold);
+  color: var(--color-heading);
+  margin-bottom: var(--space-3);
+}
+
+.risk-finding {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.finding-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.finding-name {
+  font-weight: var(--font-semibold);
+  color: var(--color-heading);
+}
+
+.finding-type {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+}
+
+.risk-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+  text-transform: uppercase;
+}
+
+.risk-badge.risk-high, .risk-high .risk-score-number { color: var(--color-danger); }
+.risk-badge.risk-medium, .risk-medium .risk-score-number { color: var(--color-warning); }
+.risk-badge.risk-low, .risk-low .risk-score-number { color: var(--color-success); }
+
+.risk-badge.risk-high { background: var(--color-danger-light); }
+.risk-badge.risk-medium { background: var(--color-warning-bg); }
+.risk-badge.risk-low { background: var(--color-green-50); }
+
+.finding-details {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.finding-reason {
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  margin-top: var(--space-1);
+}
+
+.finding-quote {
+  margin: var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--color-warning);
+  background: var(--color-warning-bg);
+  font-size: var(--text-sm);
+  font-style: italic;
 }
 
 /* Analysis */

@@ -102,3 +102,30 @@ class TenderItem(Base):
 
     # Relationships
     tender = relationship("Tender", back_populates="items")
+    price_history = relationship(
+        "PriceHistory",
+        back_populates="tender_item",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+
+class PriceHistory(Base):
+    """Tracks market prices over time for tender items."""
+    __tablename__ = "price_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    item_id = Column(
+        Integer,
+        ForeignKey("tender_items.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    price = Column(Float, nullable=False)
+    source_store = Column(String(100), nullable=False)
+    product_title = Column(String(500), nullable=True)
+    product_url = Column(String(1000), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    # Relationships
+    tender_item = relationship("TenderItem", back_populates="price_history")
