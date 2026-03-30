@@ -47,6 +47,24 @@ const router = createRouter({
       component: () => import('@/views/ProzorroView.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/tenders',
+      name: 'TenderList',
+      component: () => import('@/views/tenders/TenderListView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/tenders/create',
+      name: 'TenderCreate',
+      component: () => import('@/views/tenders/TenderCreateView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/tenders/:id',
+      name: 'TenderDetail',
+      component: () => import('@/views/tenders/TenderDetailView.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 

@@ -13,8 +13,12 @@ from openpyxl import load_workbook
 from pydantic import BaseModel
 
 from app.routers.prozorro_router import prozorro_router
+from app.routers.tender_router import tender_router
 from app.routers.ai_assistant import router as assistant_router
 from app.services.parser_service import search_products_async, get_available_stores
+
+# Ensure tender models are registered with Base.metadata
+import app.models.tender  # noqa: F401
 
 
 
@@ -112,6 +116,7 @@ app.include_router(
     dependencies=[Depends(get_current_user)]
 )
 app.include_router(prozorro_router)
+app.include_router(tender_router)
 
 
 @app.get("/", tags=["Root"])

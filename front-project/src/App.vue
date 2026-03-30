@@ -55,6 +55,7 @@ export default {
           <template v-if="isAuthenticated">
             <router-link to="/excel-page" class="nav-link" active-class="nav-link--active">Excel</router-link>
             <router-link to="/search-tender" class="nav-link" active-class="nav-link--active">Prozorro</router-link>
+            <router-link to="/tenders" class="nav-link" active-class="nav-link--active">Тендери</router-link>
             <router-link to="/xpath" class="nav-link" active-class="nav-link--active">X-Path</router-link>
           </template>
         </nav>
@@ -94,6 +95,7 @@ export default {
             <template v-if="isAuthenticated">
               <li><router-link to="/excel-page" @click="closeMenu">Excel</router-link></li>
               <li><router-link to="/search-tender" @click="closeMenu">Prozorro</router-link></li>
+              <li><router-link to="/tenders" @click="closeMenu">Тендери</router-link></li>
               <li><router-link to="/xpath" @click="closeMenu">X-Path</router-link></li>
               <li><a href="#" @click.prevent="handleLogout">Вийти</a></li>
             </template>
