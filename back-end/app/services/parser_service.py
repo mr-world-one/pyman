@@ -174,6 +174,7 @@ async def search_products_async(
     """
     Search for a product across multiple stores asynchronously.
     Each store parser runs in a separate thread via asyncio.to_thread().
+    Results are cached per store in Redis (L1 cache).
 
     Args:
         product_name: Name of the product to search for
@@ -185,13 +186,31 @@ async def search_products_async(
     Returns:
         List of product dicts with store info attached
     """
+    from app.services.cache import get_cached, set_cached, make_search_key
+
     # Validate stores
     valid_stores = [s for s in stores if s in AVAILABLE_PARSERS]
     if not valid_stores:
         logger.warning(f"No valid stores provided: {stores}")
         return []
 
-    # Run all parsers in parallel threads
+    all_products = []
+    stores_to_search = []
+
+    # L1 cache: check each store individually
+    for store in valid_stores:
+        cache_key = make_search_key(store, product_name, n)
+        cached = await get_cached(cache_key)
+        if cached is not None:
+            logger.info(f"[{store}] Cache hit for '{product_name[:60]}'")
+            all_products.extend(cached)
+        else:
+            stores_to_search.append(store)
+
+    if not stores_to_search:
+        return all_products
+
+    # Run uncached stores in parallel threads
     tasks = [
         asyncio.to_thread(
             _sync_search_products,
@@ -201,17 +220,20 @@ async def search_products_async(
             fast_parse,
             ignore_price_format,
         )
-        for store in valid_stores
+        for store in stores_to_search
     ]
 
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    # Flatten results
-    all_products = []
-    for store, result in zip(valid_stores, results):
+    # Process results and cache per store
+    for store, result in zip(stores_to_search, results):
         if isinstance(result, Exception):
             logger.warning(f"[{store}] Exception during search: {result}")
             continue
+        # Cache this store's results (even empty — avoids re-searching)
+        cache_key = make_search_key(store, product_name, n)
+        await set_cached(cache_key, result)
+        logger.info(f"[{store}] Cache miss — stored {len(result)} results for '{product_name[:60]}'")
         all_products.extend(result)
 
     return all_products
@@ -258,17 +280,12 @@ async def search_and_validate_items(
 ) -> List[Dict[str, Any]]:
     """
     Search for each tender item across stores, then validate matches with Gemini LLM.
-    Returns a list of matched groups — one per tender item — with validated store products.
+    Uses L2 cache to skip both search and validation for previously seen items.
 
-    Each group:
-    {
-        "tender_item": { name, quantity, unit_name, unit_price, total_price },
-        "matches": [
-            { title, store, store_name, url, price, price_on_sale, is_available,
-              is_relevant, store_weight_g, tender_weight_g, price_per_unit, tender_price_per_unit }
-        ]
-    }
+    Returns a list of matched groups — one per tender item — with validated store products.
     """
+    from app.services.cache import get_cached, set_cached, make_validated_key
+
     matched_items = []
 
     for item in items:
@@ -284,6 +301,16 @@ async def search_and_validate_items(
                 "matches": [],
                 "skipped_reason": "service",
             })
+            continue
+
+        # L2 cache: check for validated results
+        l2_key = make_validated_key(product_name, stores, n)
+        cached_group = await get_cached(l2_key)
+        if cached_group is not None:
+            logger.info(f"L2 cache hit for '{product_name[:60]}'")
+            # Restore the original tender_item from this request
+            cached_group["tender_item"] = item
+            matched_items.append(cached_group)
             continue
 
         tender_price = None
@@ -304,7 +331,7 @@ async def search_and_validate_items(
 
         tender_unit = item.get("unit_name")
 
-        # Search all stores in parallel
+        # Search all stores in parallel (uses L1 cache internally)
         store_results = await search_products_async(
             product_name=product_name,
             stores=stores,
@@ -325,10 +352,15 @@ async def search_and_validate_items(
         # Keep only relevant matches
         relevant = [m for m in validated if m.get("is_relevant", True)]
 
-        matched_items.append({
+        group = {
             "tender_item": item,
             "matches": relevant,
-        })
+        }
+        matched_items.append(group)
+
+        # Store in L2 cache
+        await set_cached(l2_key, group)
+        logger.info(f"L2 cache miss — stored {len(relevant)} validated matches for '{product_name[:60]}'")
 
     return matched_items
 

@@ -57,6 +57,9 @@ RUN pip install --no-cache-dir email-validator
 # Google Gemini API for LLM-based product validation
 RUN pip install --no-cache-dir google-generativeai
 
+# Redis async client for caching
+RUN pip install --no-cache-dir "redis>=5.0.0"
+
 # Copy source code
 COPY back-end/ /app/back-end/
 COPY scraper/ /app/scraper/

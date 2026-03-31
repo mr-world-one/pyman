@@ -54,12 +54,6 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
-      path: '/tenders/create',
-      name: 'TenderCreate',
-      component: () => import('@/views/tenders/TenderCreateView.vue'),
-      meta: { requiresAuth: true },
-    },
-    {
       path: '/tenders/:id',
       name: 'TenderDetail',
       component: () => import('@/views/tenders/TenderDetailView.vue'),

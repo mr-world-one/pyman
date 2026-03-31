@@ -206,10 +206,10 @@
       </div>
     </div>
 
-    <AppLoader v-if="store.loading.value && !tender" :overlay="true" />
+    <AppLoader v-if="store.loading && !tender" :overlay="true" />
 
-    <div v-if="store.error.value && !tender" class="error-page">
-      <p>{{ store.error.value }}</p>
+    <div v-if="store.error && !tender" class="error-page">
+      <p>{{ store.error }}</p>
       <AppButton @click="$router.push('/tenders')">До списку тендерів</AppButton>
     </div>
   </div>
@@ -240,7 +240,7 @@ export default {
     const router = useRouter()
     const store = useTendersStore()
 
-    const tender = computed(() => store.currentTender.value)
+    const tender = computed(() => store.currentTender)
     const showAnalysis = ref(false)
     const analyzing = ref(false)
     const analysisResults = ref(null)
@@ -271,7 +271,22 @@ export default {
     const analyzingRisks = ref(false)
 
     onMounted(() => {
-      store.fetchTender(Number(route.params.id))
+      const id = Number(route.params.id)
+      store.fetchTender(id)
+
+      // Restore cached results
+      const cachedAnalysis = store.getCachedAnalysis(id)
+      if (cachedAnalysis) {
+        analysisResults.value = cachedAnalysis
+      }
+      const cachedRisk = store.getCachedRisk(id)
+      if (cachedRisk) {
+        riskResult.value = cachedRisk
+      }
+      const cachedHistory = store.getCachedPriceHistory(id)
+      if (cachedHistory) {
+        priceHistory.value = cachedHistory
+      }
     })
 
     const processedAnalysis = computed(() => {

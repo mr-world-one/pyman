@@ -14,6 +14,11 @@ export const useTendersStore = defineStore('tenders', () => {
     limit: 20,
   })
 
+  // Cached analysis results per tender ID — survives tab switches and navigation
+  const analysisCache = ref({})   // { [tenderId]: { matched_items, ... } }
+  const riskCache = ref({})       // { [tenderId]: { risk_score, risk_level, ... } }
+  const priceHistoryCache = ref({}) // { [tenderId]: { items, ... } }
+
   const filteredTenders = computed(() => tenders.value)
 
   const totalPages = computed(() => {
@@ -56,21 +61,6 @@ export const useTendersStore = defineStore('tenders', () => {
     }
   }
 
-  async function createTender(tenderData) {
-    loading.value = true
-    error.value = null
-    try {
-      const { data } = await apiClient.post('/tenders/', tenderData)
-      tenders.value.unshift(data)
-      return data
-    } catch (err) {
-      error.value = err.response?.data?.detail || err.message || 'Помилка створення'
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
   async function importFromProzorro(prozorroId) {
     loading.value = true
     error.value = null
@@ -106,6 +96,7 @@ export const useTendersStore = defineStore('tenders', () => {
       const { data } = await apiClient.post(`/tenders/${id}/analyze`, null, {
         params: { stores: stores.join(',') },
       })
+      analysisCache.value[id] = data
       return data
     } catch (err) {
       error.value = err.response?.data?.detail || err.message || 'Помилка аналізу'
@@ -120,6 +111,7 @@ export const useTendersStore = defineStore('tenders', () => {
       const { data } = await apiClient.get(`/tenders/${id}/price-history`, {
         params: { days },
       })
+      priceHistoryCache.value[id] = data
       return data
     } catch (err) {
       error.value = err.response?.data?.detail || err.message || 'Помилка завантаження історії цін'
@@ -134,6 +126,9 @@ export const useTendersStore = defineStore('tenders', () => {
       const { data } = await apiClient.post('/assistant/analyze-risks', null, {
         params: { tender_id: tenderId, stores: stores.join(',') },
       })
+      if (data?.risk_details) {
+        riskCache.value[tenderId] = data.risk_details
+      }
       return data
     } catch (err) {
       error.value = err.response?.data?.detail || err.message || 'Помилка аналізу ризиків'
@@ -141,6 +136,18 @@ export const useTendersStore = defineStore('tenders', () => {
     } finally {
       loading.value = false
     }
+  }
+
+  function getCachedAnalysis(id) {
+    return analysisCache.value[id] || null
+  }
+
+  function getCachedRisk(id) {
+    return riskCache.value[id] || null
+  }
+
+  function getCachedPriceHistory(id) {
+    return priceHistoryCache.value[id] || null
   }
 
   function setFilter(key, value) {
@@ -166,12 +173,17 @@ export const useTendersStore = defineStore('tenders', () => {
     totalPages,
     fetchTenders,
     fetchTender,
-    createTender,
     importFromProzorro,
     deleteTender,
     analyzeTender,
     fetchPriceHistory,
     analyzeRisks,
+    getCachedAnalysis,
+    getCachedRisk,
+    getCachedPriceHistory,
+    analysisCache,
+    riskCache,
+    priceHistoryCache,
     setFilter,
     nextPage,
     prevPage,

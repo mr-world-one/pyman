@@ -4,40 +4,39 @@
       <div class="page-header">
         <h1>Мої тендери</h1>
         <div class="header-actions">
-          <AppButton variant="ghost" @click="showImportModal = true">Імпорт з Prozorro</AppButton>
-          <AppButton @click="$router.push('/tenders/create')">Створити тендер</AppButton>
+          <AppButton @click="showImportModal = true">Імпорт з Prozorro</AppButton>
         </div>
       </div>
 
-      <TenderFilters v-model="store.filters.value" @update:modelValue="onFilterChange" />
+      <TenderFilters v-model="store.filters" @update:modelValue="onFilterChange" />
 
-      <AppLoader v-if="store.loading.value" />
+      <AppLoader v-if="store.loading" />
 
-      <div v-else-if="store.error.value" class="error-message">
-        <p>{{ store.error.value }}</p>
+      <div v-else-if="store.error" class="error-message">
+        <p>{{ store.error }}</p>
       </div>
 
-      <div v-else-if="store.tenders.value.length === 0" class="empty-state">
+      <div v-else-if="store.tenders.length === 0" class="empty-state">
         <div class="empty-icon">📋</div>
         <h3>Тендерів поки немає</h3>
-        <p>Створіть новий тендер або імпортуйте з Prozorro</p>
+        <p>Імпортуйте тендер з Prozorro</p>
       </div>
 
       <div v-else class="tenders-grid">
         <TenderCard
-          v-for="tender in store.tenders.value"
+          v-for="tender in store.tenders"
           :key="tender.id"
           :tender="tender"
           @click="$router.push(`/tenders/${tender.id}`)"
         />
       </div>
 
-      <div v-if="store.tenders.value.length > 0" class="pagination">
-        <AppButton variant="ghost" size="sm" :disabled="store.filters.value.page <= 1" @click="store.prevPage(); store.fetchTenders()">
+      <div v-if="store.tenders.length > 0" class="pagination">
+        <AppButton variant="ghost" size="sm" :disabled="store.filters.page <= 1" @click="store.prevPage(); store.fetchTenders()">
           &larr; Назад
         </AppButton>
-        <span class="page-num">Сторінка {{ store.filters.value.page }}</span>
-        <AppButton variant="ghost" size="sm" :disabled="store.tenders.value.length < store.filters.value.limit" @click="store.nextPage(); store.fetchTenders()">
+        <span class="page-num">Сторінка {{ store.filters.page }}</span>
+        <AppButton variant="ghost" size="sm" :disabled="store.tenders.length < store.filters.limit" @click="store.nextPage(); store.fetchTenders()">
           Вперед &rarr;
         </AppButton>
       </div>
@@ -74,7 +73,7 @@ export default {
     })
 
     const onFilterChange = (newFilters) => {
-      store.filters.value = newFilters
+      store.filters = newFilters
       store.fetchTenders()
     }
 
