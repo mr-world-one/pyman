@@ -140,7 +140,6 @@ export default {
       { key: 'rozetka', name: 'Rozetka' },
       { key: 'silpo', name: 'Сільпо' },
       { key: 'epicentr', name: 'Епіцентр' },
-      { key: 'citadel', name: 'Citadel' },
     ];
     const selectedStores = ref(['rozetka', 'silpo', 'epicentr']);
 
@@ -459,7 +458,6 @@ input:focus {
 .store-rozetka { background: var(--color-green-100); color: var(--color-green-700); }
 .store-silpo { background: var(--color-warning-bg); color: var(--color-warning); }
 .store-epicentr { background: var(--color-info-bg); color: var(--color-info); }
-.store-citadel { background: var(--color-danger-light); color: var(--color-danger); }
 
 .price-higher { color: var(--color-danger); font-weight: var(--font-bold); background: var(--color-danger-light); border-radius: var(--radius-sm); }
 .price-lower { color: var(--color-success); font-weight: var(--font-bold); background: var(--color-green-50); border-radius: var(--radius-sm); }

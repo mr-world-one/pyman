@@ -65,12 +65,11 @@ async def list_available_stores():
 @prozorro_router.get("/search-tender/{contract_id}")
 async def prozorro_data(
     contract_id: str,
-    stores: str = Query(default="rozetka", description="Comma-separated store keys: rozetka,silpo,epicentr,citadel"),
+    stores: str = Query(default="rozetka", description="Comma-separated store keys: rozetka,silpo,epicentr"),
     current_user: str = Depends(get_current_user),
 ):
     """
     Search Prozorro tender by contract ID and compare prices from selected stores.
-    Selenium runs in background threads via asyncio.to_thread().
     """
     store_list = [s.strip() for s in stores.split(",") if s.strip()]
     if not store_list:

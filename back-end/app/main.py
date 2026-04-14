@@ -24,7 +24,7 @@ import app.models.tender  # noqa: F401
 
 
 # Local imports
-from .routers import crud, xpath
+from .routers import crud
 from .routers.authorization import router as auth_router, get_current_user
 from .database import Base
 from .db_test import verify_database_connection
@@ -107,12 +107,6 @@ app.include_router(
     crud.router,
     prefix="/api",
     tags=["CRUD Operations"],
-    dependencies=[Depends(get_current_user)]
-)
-app.include_router(
-    xpath.router,
-    prefix="/xpath",
-    tags=["XPath Operations"],
     dependencies=[Depends(get_current_user)]
 )
 app.include_router(prozorro_router)
@@ -201,12 +195,11 @@ def parse_excel_file(file_content: bytes):
 @app.post("/excel-page")
 async def upload_excel(
     file: UploadFile = File(...),
-    stores: str = Query(default="rozetka", description="Comma-separated store keys: rozetka,silpo,epicentr,citadel"),
+    stores: str = Query(default="rozetka", description="Comma-separated store keys: rozetka,silpo,epicentr"),
     current_user: str = Depends(get_current_user),
 ):
     """
     Upload an Excel file with tender items and compare prices from selected stores.
-    Selenium parsers run in background threads via asyncio.to_thread().
     """
     store_list = [s.strip() for s in stores.split(",") if s.strip()]
     if not store_list:

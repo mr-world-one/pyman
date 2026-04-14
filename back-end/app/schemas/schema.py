@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, AnyUrl
+from pydantic import BaseModel, EmailStr
 from typing import Optional
 
 class UserBase(BaseModel):
@@ -43,40 +43,5 @@ class Token(BaseModel):
             "example": {
                 "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
                 "token_type": "bearer"
-            }
-        }
-
-class StoreBase(BaseModel):
-    name: str
-    url: AnyUrl
-    title_xpath: str
-    available_xpath: str
-    price_xpath: str
-    price_without_sale_xpath: str
-    price_on_sale_xpath: str
-
-class StoreCreate(StoreBase):
-    pass
-
-class StoreResponse(StoreBase):
-    id: int
-
-    class Config:
-        from_attributes = True
-
-class StoreEditRequest(BaseModel):
-    url: Optional[AnyUrl] = None
-    title_xpath: Optional[str] = None
-    available_xpath: Optional[str] = None
-    price_xpath: Optional[str] = None
-    price_without_sale_xpath: Optional[str] = None
-    price_on_sale_xpath: Optional[str] = None
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "url": "https://example.com",
-                "title_xpath": "//h1",
-                "price_xpath": "//span[@class='price']"
             }
         }

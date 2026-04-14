@@ -82,7 +82,6 @@ export default {
       { key: 'rozetka', name: 'Rozetka' },
       { key: 'silpo', name: 'Сільпо' },
       { key: 'epicentr', name: 'Епіцентр' },
-      { key: 'citadel', name: 'Citadel' },
     ];
     const selectedStores = ref(['rozetka']);
 

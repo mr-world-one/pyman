@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(find)",
-      "Bash(docker compose:*)"
+      "Bash(docker compose:*)",
+      "Bash(find:)",
+      "Bash(curl -s \"https://citadelbuddekor.com.ua/\")",
+      "Bash(curl)",
+      "Bash(xargs)"
     ]
   }
 }

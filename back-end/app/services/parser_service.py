@@ -10,7 +10,6 @@ from typing import List, Dict, Any, Optional
 from scraper.parsers.rozetka_parser import RozetkaParser
 from scraper.parsers.silpo_parser import SilpoParser
 from scraper.parsers.epicentr_parser import EpicentrParser
-from scraper.parsers.citadel_parser import CitadelParser
 from app.services.llm_validator import validate_matches, is_service_item
 
 logger = logging.getLogger(__name__)
@@ -31,11 +30,6 @@ AVAILABLE_PARSERS = {
         "class": EpicentrParser,
         "name": "Епіцентр",
         "url": "https://epicentrk.ua",
-    },
-    "citadel": {
-        "class": CitadelParser,
-        "name": "Citadel",
-        "url": "https://citadelbuddekor.com.ua",
     },
 }
 

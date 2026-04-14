@@ -1,24 +1,7 @@
 FROM python:3.11-slim
 
-# System deps: Chromium for Selenium, OCR tools
+# System deps: OCR tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    chromium \
-    chromium-driver \
-    fonts-liberation \
-    libnss3 \
-    libatk-bridge2.0-0 \
-    libgtk-3-0 \
-    libx11-xcb1 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxrandr2 \
-    libgbm1 \
-    libasound2 \
-    libpango-1.0-0 \
-    libcairo2 \
-    xdg-utils \
-    wget \
-    curl \
     tesseract-ocr \
     tesseract-ocr-ukr \
     tesseract-ocr-eng \
@@ -27,11 +10,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     pkg-config \
     && rm -rf /var/lib/apt/lists/*
-
-# Chrome / Selenium env vars
-ENV CHROME_BIN=/usr/bin/chromium
-ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
-ENV DISPLAY=:99
 
 WORKDIR /app
 
@@ -44,9 +22,6 @@ RUN pip install --no-cache-dir --upgrade pip && \
 RUN pip install --no-cache-dir \
     PyMuPDF \
     ocrmypdf
-
-# Install scraper deps (psycopg2-binary for Docker, selenium, etc.)
-RUN pip install --no-cache-dir selenium webdriver-manager psycopg2-binary
 
 # Install additional packages needed for async DB and Excel parsing
 RUN pip install --no-cache-dir "sqlalchemy[asyncio]" asyncpg python-dotenv openpyxl pandas

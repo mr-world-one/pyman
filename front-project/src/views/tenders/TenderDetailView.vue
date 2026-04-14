@@ -249,7 +249,6 @@ export default {
       { key: 'rozetka', name: 'Rozetka' },
       { key: 'silpo', name: 'Сільпо' },
       { key: 'epicentr', name: 'Епіцентр' },
-      { key: 'citadel', name: 'Citadel' },
     ]
 
     // Tabs
@@ -713,7 +712,6 @@ export default {
 .store-rozetka { background: var(--color-green-100); color: var(--color-green-700); }
 .store-silpo { background: var(--color-warning-bg); color: var(--color-warning); }
 .store-epicentr { background: var(--color-info-bg); color: var(--color-info); }
-.store-citadel { background: var(--color-danger-light); color: var(--color-danger); }
 .no-matches { padding: var(--space-3); color: var(--color-text-secondary); font-style: italic; }
 
 /* Analysis modal */

@@ -57,7 +57,6 @@ export default {
       'Rozetka': '#4caf50',
       'Сільпо': '#ff9800',
       'Епіцентр': '#2196f3',
-      'Citadel': '#f44336',
     }
 
     const getStoreColor = (store) => STORE_COLORS[store] || '#9e9e9e'
