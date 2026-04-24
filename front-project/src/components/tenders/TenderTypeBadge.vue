@@ -1,8 +1,10 @@
 <template>
-  <span class="tender-type-badge" :class="'type-' + type">{{ label }}</span>
+  <AppBadge :variant="variant">{{ label }}</AppBadge>
 </template>
 
 <script>
+import AppBadge from '@/components/AppBadge.vue'
+
 const TYPE_LABELS = {
   product: 'Товари',
   service: 'Послуги',
@@ -11,53 +13,23 @@ const TYPE_LABELS = {
   mixed: 'Змішаний',
 }
 
+const TYPE_VARIANTS = {
+  product: 'brand',
+  service: 'info',
+  work: 'warn',
+  consulting: 'slate',
+  mixed: 'danger',
+}
+
 export default {
   name: 'TenderTypeBadge',
+  components: { AppBadge },
   props: {
     type: { type: String, required: true },
   },
   computed: {
-    label() {
-      return TYPE_LABELS[this.type] || this.type
-    },
+    label() { return TYPE_LABELS[this.type] || this.type },
+    variant() { return TYPE_VARIANTS[this.type] || 'slate' },
   },
 }
 </script>
-
-<style scoped>
-.tender-type-badge {
-  display: inline-block;
-  padding: 0.2rem 0.6rem;
-  border-radius: var(--radius-full);
-  font-size: var(--text-xs);
-  font-weight: var(--font-bold);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
-}
-
-.type-product {
-  background: var(--color-green-100);
-  color: var(--color-green-700);
-}
-
-.type-service {
-  background: var(--color-info-bg);
-  color: var(--color-info);
-}
-
-.type-work {
-  background: var(--color-warning-bg);
-  color: var(--color-warning);
-}
-
-.type-consulting {
-  background: var(--color-gray-100);
-  color: var(--color-gray-700);
-}
-
-.type-mixed {
-  background: var(--color-danger-light);
-  color: var(--color-danger);
-}
-</style>

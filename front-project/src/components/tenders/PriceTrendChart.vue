@@ -54,12 +54,12 @@ export default {
     }
 
     const STORE_COLORS = {
-      'Rozetka': '#4caf50',
-      'Сільпо': '#ff9800',
-      'Епіцентр': '#2196f3',
+      'Rozetka': '#2563eb',   // info
+      'Сільпо': '#059669',    // brand
+      'Епіцентр': '#b45309',  // warn
     }
 
-    const getStoreColor = (store) => STORE_COLORS[store] || '#9e9e9e'
+    const getStoreColor = (store) => STORE_COLORS[store] || '#94a3b8'
 
     const renderCharts = async () => {
       if (!props.priceHistory?.items?.length) {
@@ -131,9 +131,9 @@ export default {
               { x: minDate, y: item.tender_price },
               { x: maxDate, y: item.tender_price },
             ],
-            borderColor: '#e91e63',
-            borderDash: [8, 4],
-            borderWidth: 2,
+            borderColor: '#0f172a',
+            borderDash: [6, 4],
+            borderWidth: 1.5,
             fill: false,
             pointRadius: 0,
             pointHoverRadius: 0,
@@ -183,7 +183,7 @@ export default {
 
 <style scoped>
 .price-trend-chart {
-  margin-top: var(--space-4);
+  margin-top: var(--space-2);
 }
 
 .chart-loading {
@@ -200,15 +200,20 @@ export default {
   text-align: center;
   color: var(--color-text-secondary);
   font-style: italic;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-subtle);
 }
 
 .chart-item {
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-5);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: var(--space-4);
+  padding: var(--space-5);
 }
+
+.chart-item:last-child { margin-bottom: 0; }
 
 .chart-item-header {
   display: flex;
@@ -220,20 +225,24 @@ export default {
 }
 
 .chart-item-header h4 {
-  font-size: var(--text-base);
-  font-weight: var(--font-bold);
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
   color: var(--color-heading);
+  letter-spacing: 0;
   margin: 0;
 }
 
 .tender-price-tag {
-  display: inline-block;
-  padding: 0.2rem 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
   border-radius: var(--radius-full);
-  font-size: var(--text-xs);
-  font-weight: var(--font-semibold);
-  background: var(--color-danger-light);
-  color: var(--color-danger);
+  font-size: 11px;
+  font-weight: var(--font-medium);
+  background: var(--color-bg-subtle);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  font-variant-numeric: tabular-nums;
 }
 
 .chart-canvas-wrapper {

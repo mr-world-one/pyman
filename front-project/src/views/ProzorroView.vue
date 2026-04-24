@@ -1,119 +1,180 @@
 <template>
-  <div class="tender-page">
-    <div class="tender-container">
-      <h1>Пошук тендеру</h1>
-      <p>Введіть ID Prozorro-тендеру для аналізу:</p>
-
-      <form @submit.prevent="analyzeTender">
-        <input
-          type="text"
-          v-model.trim="tenderId"
-          placeholder="Введіть ID тендеру (наприклад, UA-2023-01-01-000001-a)"
-          required
-        />
-        <StoreSelector v-model="selectedStores" :stores="availableStores" />
-        <AppButton
-          type="submit"
-          size="lg"
-          :disabled="isLoading || selectedStores.length === 0"
-          style="margin-top: var(--space-2)"
-        >
-          Аналізувати
-        </AppButton>
-      </form>
-
-      <div v-if="error" class="error-message">
-        <p>{{ error }}</p>
+  <div class="prozorro">
+    <div class="prozorro__inner">
+      <div class="page-header">
+        <div>
+          <h1 class="page-header__title">Аналіз по ID Prozorro</h1>
+          <p class="page-header__subtitle">
+            Введіть ідентифікатор закупівлі — перевірте позиції за пів хвилини.
+          </p>
+        </div>
+        <a href="#" class="doc-link">
+          <AppIcon name="link" :size="14" /> Документація API
+        </a>
       </div>
 
-      <div v-else-if="analytics && analytics.length" class="results-container">
-        <h2>Результати порівняння</h2>
-
-        <div class="summary-cards">
-          <div class="summary-card">
-            <div class="summary-icon">📦</div>
-            <div class="summary-value">{{ analytics.length }}</div>
-            <div class="summary-label">Товарів у тендері</div>
-          </div>
-          <div class="summary-card">
-            <div class="summary-icon">🏪</div>
-            <div class="summary-value">{{ totalStoreMatches }}</div>
-            <div class="summary-label">Знайдено в магазинах</div>
-          </div>
-          <div v-if="hasPricesTender" class="summary-card" :class="overallSavings >= 0 ? 'card-positive' : 'card-negative'">
-            <div class="summary-icon">{{ overallSavings >= 0 ? '📈' : '📉' }}</div>
-            <div class="summary-value">{{ overallSavings >= 0 ? '+' : '' }}{{ overallSavings.toFixed(2) }} грн</div>
-            <div class="summary-label">Тендер {{ overallSavings >= 0 ? 'дорожче' : 'дешевше' }} ринку</div>
-          </div>
-          <div class="summary-card">
-            <div class="summary-icon">💰</div>
-            <div class="summary-value">{{ bestDealStore || '—' }}</div>
-            <div class="summary-label">Найвигідніший магазин</div>
-          </div>
-        </div>
-
-        <div v-for="group in analytics" :key="group.name" class="product-group">
-          <div class="product-header">
-            <div class="product-name">{{ group.name }}</div>
-            <div class="product-meta">
-              <span class="meta-badge tender-badge" v-if="group.tender_price > 0">
-                Тендер: <strong>{{ group.tender_price.toFixed(2) }} грн</strong>
-              </span>
-              <span class="meta-badge tender-badge" v-else>Тендер: <strong>Не вказано</strong></span>
-              <span class="meta-badge qty-badge" v-if="group.quantity">{{ group.quantity }} {{ group.unit_name || 'шт' }}</span>
-              <span class="meta-badge total-badge" v-if="group.total_price">Всього: {{ group.total_price.toFixed(2) }} грн</span>
+      <!-- Search panel -->
+      <div class="search-panel">
+        <FormGroup label="ID закупівлі Prozorro">
+          <div class="search-row">
+            <div class="search-row__input">
+              <AppIcon name="search" :size="14" class="search-row__icon" />
+              <input
+                type="text"
+                v-model.trim="tenderId"
+                class="app-input app-input--with-icon mono"
+                placeholder="UA-2023-01-01-000001-a"
+                @keydown.enter="analyzeTender"
+              />
             </div>
+            <AppButton
+              size="lg"
+              :disabled="isLoading || selectedStores.length === 0 || !tenderId"
+              :loading="isLoading"
+              @click="analyzeTender"
+            >
+              Аналізувати
+              <template #icon-right><AppIcon name="arrow-right" :size="14" /></template>
+            </AppButton>
           </div>
+        </FormGroup>
 
-          <table class="modern-table" v-if="group.matches.length">
-            <thead>
-              <tr>
-                <th>Магазин</th>
-                <th>Назва в магазині</th>
-                <th>Ціна</th>
-                <th>Ціна/кг</th>
-                <th>Різниця</th>
-                <th>%</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="(match, idx) in group.matches"
-                :key="idx"
-                class="table-row"
-                :class="{ 'best-match': idx === 0 }"
-              >
-                <td><span class="store-badge" :class="'store-' + match.store">{{ match.store_name }}</span></td>
-                <td class="product-title-cell">
-                  <a :href="match.url" target="_blank" rel="noopener" v-if="match.url">{{ match.title }}</a>
-                  <span v-else>{{ match.title }}</span>
-                  <span class="sale-tag" v-if="match.is_on_sale">АКЦІЯ</span>
-                  <span class="weight-tag" v-if="match.store_weight_g">{{ formatWeight(match.store_weight_g) }}</span>
-                </td>
-                <td class="price-cell">
-                  <span class="current-price">{{ formatPrice(match.effective_price) }} грн</span>
-                  <span class="old-price" v-if="match.is_on_sale && match.original_price">{{ formatPrice(match.original_price) }} грн</span>
-                </td>
-                <td class="price-cell">
-                  <template v-if="match.price_per_unit">
-                    <span class="normalized-price">{{ formatPrice(match.price_per_unit) }} грн</span>
-                    <span class="normalized-label" v-if="match.tender_price_per_unit">
-                      тендер: {{ formatPrice(match.tender_price_per_unit) }}
-                    </span>
-                  </template>
-                  <span v-else class="no-data">—</span>
-                </td>
-                <td :class="getDifferenceClass(match.diff)">{{ formatDiff(match.diff) }}</td>
-                <td :class="getDifferenceClass(match.diff)">{{ formatPercent(match.diff, group.tender_price) }}</td>
-              </tr>
-            </tbody>
-          </table>
-          <div v-else class="no-matches">Не знайдено в жодному магазині</div>
+        <div class="stores-block">
+          <StoreSelector v-model="selectedStores" :stores="availableStores" />
         </div>
       </div>
 
-      <div v-else-if="tenderId && !isLoading">
-        <p>Дані відсутні або товари не знайдені.</p>
+      <div v-if="error" class="alert alert-error">{{ error }}</div>
+
+      <!-- Summary -->
+      <div v-if="analytics && analytics.length" class="summary-cards">
+        <StatCard label="Товарів у тендері" :value="analytics.length" />
+        <StatCard label="Знайдено в магазинах" :value="totalStoreMatches" :meta="coverageLabel" />
+        <StatCard
+          v-if="hasPricesTender"
+          :label="overallSavings >= 0 ? 'Тендер дорожче' : 'Тендер дешевше'"
+          :variant="overallSavings >= 0 ? 'danger' : 'brand'"
+        >
+          <template #value>
+            {{ overallSavings >= 0 ? '+' : '' }}{{ overallSavings.toFixed(2) }} ₴
+          </template>
+        </StatCard>
+        <StatCard label="Найвигідніший">
+          <template #value>
+            <span class="best-store">
+              <span class="best-store__dot"></span>
+              {{ bestDealStore || '—' }}
+            </span>
+          </template>
+        </StatCard>
+      </div>
+
+      <!-- Results -->
+      <div v-if="analytics && analytics.length" class="results">
+        <div class="results__head">
+          <div>
+            <h3 class="results__title">Результати порівняння</h3>
+            <p class="results__sub">Згруповано по тендерних позиціях</p>
+          </div>
+          <div class="results__actions">
+            <button class="ghost-btn">
+              <AppIcon name="filter" :size="14" /> Фільтр
+            </button>
+            <button class="ghost-btn">
+              <AppIcon name="download" :size="14" /> Експорт
+            </button>
+          </div>
+        </div>
+        <div class="results__groups">
+          <article
+            v-for="group in analytics"
+            :key="group.name"
+            class="price-group"
+          >
+            <header class="price-group__head">
+              <div>
+                <h4 class="price-group__title">{{ group.name }}</h4>
+                <div class="price-group__meta num">
+                  <span v-if="group.tender_price > 0">
+                    Тендер: <span class="price-group__meta-val">{{ group.tender_price.toFixed(2) }} ₴</span>
+                  </span>
+                  <span v-if="group.quantity" class="price-group__meta-sep">·</span>
+                  <span v-if="group.quantity">
+                    {{ group.quantity }} {{ group.unit_name || 'шт' }}
+                  </span>
+                  <span v-if="group.total_price" class="price-group__meta-sep">·</span>
+                  <span v-if="group.total_price">
+                    Всього: <span class="price-group__meta-val">{{ group.total_price.toFixed(2) }} ₴</span>
+                  </span>
+                </div>
+              </div>
+              <AppBadge variant="slate">{{ group.matches.length }} пропозицій</AppBadge>
+            </header>
+            <div v-if="group.matches.length" class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th class="col-store">Магазин</th>
+                    <th>Назва в магазині</th>
+                    <th class="col-num">Ціна</th>
+                    <th class="col-num">Ціна/кг</th>
+                    <th class="col-num">Різниця</th>
+                    <th class="col-num col-pct">%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="(match, idx) in group.matches"
+                    :key="idx"
+                    :class="['row-hover', { 'best-row best-match': idx === 0 }]"
+                  >
+                    <td>
+                      <span class="store-cell">
+                        <span :class="['store-dot', `store-${match.store}`]"></span>
+                        {{ match.store_name }}
+                      </span>
+                      <div v-if="idx === 0" class="store-cell__best">Найкраща пропозиція</div>
+                    </td>
+                    <td class="name-cell">
+                      <a v-if="match.url" :href="match.url" target="_blank" rel="noopener">{{ match.title }}</a>
+                      <span v-else>{{ match.title }}</span>
+                      <AppBadge v-if="match.is_on_sale" variant="danger">Акція</AppBadge>
+                      <span v-if="match.store_weight_g" class="weight-tag num">{{ formatWeight(match.store_weight_g) }}</span>
+                    </td>
+                    <td class="num col-num">
+                      <div>{{ formatPrice(match.effective_price) }} ₴</div>
+                      <div v-if="match.is_on_sale && match.original_price" class="old-price num">
+                        {{ formatPrice(match.original_price) }} ₴
+                      </div>
+                    </td>
+                    <td class="num col-num">
+                      <template v-if="match.price_per_unit">
+                        <div>{{ formatPrice(match.price_per_unit) }} ₴</div>
+                        <div v-if="match.tender_price_per_unit" class="meta-sub num">
+                          тендер: {{ formatPrice(match.tender_price_per_unit) }}
+                        </div>
+                      </template>
+                      <span v-else class="dim">—</span>
+                    </td>
+                    <td :class="['num col-num', diffClass(match.diff)]">{{ formatDiff(match.diff) }}</td>
+                    <td :class="['num col-num col-pct', diffClass(match.diff)]">
+                      {{ formatPercent(match.diff, group.tender_price) }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-else class="price-group__empty">Не знайдено в жодному магазині</div>
+          </article>
+        </div>
+      </div>
+
+      <div v-else-if="tenderId && !isLoading && !error" class="empty-hint">
+        <EmptyState
+          icon-name="empty"
+          title="Дані відсутні"
+          description="Натисніть «Аналізувати», щоб перевірити позиції."
+        />
       </div>
     </div>
 
@@ -122,63 +183,76 @@
 </template>
 
 <script>
-import { ref, computed } from 'vue';
-import { apiClient } from '@/api/config';
-import AppButton from '@/components/AppButton.vue';
-import AppLoader from '@/components/AppLoader.vue';
-import StoreSelector from '@/components/StoreSelector.vue';
+import { ref, computed } from 'vue'
+import { apiClient } from '@/api/config'
+import AppButton from '@/components/AppButton.vue'
+import AppLoader from '@/components/AppLoader.vue'
+import AppIcon from '@/components/AppIcon.vue'
+import AppBadge from '@/components/AppBadge.vue'
+import StoreSelector from '@/components/StoreSelector.vue'
+import StatCard from '@/components/StatCard.vue'
+import FormGroup from '@/components/FormGroup.vue'
+import EmptyState from '@/components/EmptyState.vue'
 
 export default {
   name: 'Prozorro',
-  components: { AppButton, AppLoader, StoreSelector },
+  components: { AppButton, AppLoader, AppIcon, AppBadge, StoreSelector, StatCard, FormGroup, EmptyState },
   setup() {
-    const tenderId = ref('');
-    const analytics = ref(null);
-    const isLoading = ref(false);
-    const error = ref(null);
+    const tenderId = ref('')
+    const analytics = ref(null)
+    const isLoading = ref(false)
+    const error = ref(null)
     const availableStores = [
       { key: 'rozetka', name: 'Rozetka' },
       { key: 'silpo', name: 'Сільпо' },
       { key: 'epicentr', name: 'Епіцентр' },
-    ];
-    const selectedStores = ref(['rozetka', 'silpo', 'epicentr']);
+    ]
+    const selectedStores = ref(['rozetka', 'silpo', 'epicentr'])
 
-    const hasPricesTender = computed(() => analytics.value?.some((g) => g.tender_price > 0) ?? false);
+    const hasPricesTender = computed(() => analytics.value?.some((g) => g.tender_price > 0) ?? false)
 
-    const totalStoreMatches = computed(
-      () => analytics.value?.reduce((sum, g) => sum + g.matches.length, 0) ?? 0
-    );
+    const totalStoreMatches = computed(() =>
+      analytics.value?.reduce((sum, g) => sum + g.matches.length, 0) ?? 0,
+    )
+
+    const coverageLabel = computed(() => {
+      if (!analytics.value?.length) return ''
+      const matched = analytics.value.filter((g) => g.matches.length).length
+      const pct = Math.round((matched / analytics.value.length) * 100)
+      return `${pct}% покриття`
+    })
 
     const overallSavings = computed(() => {
-      if (!analytics.value) return 0;
-      return analytics.value.reduce((total, g) =>
-        g.matches.reduce((s, m) => (m.diff !== null ? s + m.diff : s), total), 0
-      );
-    });
+      if (!analytics.value) return 0
+      return analytics.value.reduce(
+        (total, g) => g.matches.reduce((s, m) => (m.diff !== null ? s + m.diff : s), total),
+        0,
+      )
+    })
 
     const bestDealStore = computed(() => {
-      if (!analytics.value) return null;
-      const totals = {};
+      if (!analytics.value) return null
+      const totals = {}
       for (const g of analytics.value) {
         for (const m of g.matches) {
           if (m.effective_price !== null) {
-            totals[m.store_name] = (totals[m.store_name] ?? 0) + m.effective_price;
+            totals[m.store_name] = (totals[m.store_name] ?? 0) + m.effective_price
           }
         }
       }
       return Object.entries(totals).reduce(
         (best, [name, total]) => (total < best[1] ? [name, total] : best),
-        [null, Infinity]
-      )[0];
-    });
+        [null, Infinity],
+      )[0]
+    })
 
     const processMatchedItems = (matchedItems) => {
-      if (!matchedItems?.length) return [];
+      if (!matchedItems?.length) return []
       return matchedItems.map((group) => {
-        const tender = group.tender_item || {};
-        const tenderPrice = parseFloat(tender.unit_price) || 0;
+        const tender = group.tender_item || {}
+        const tenderPrice = parseFloat(tender.unit_price) || 0
         const matches = (group.matches || []).map((item) => {
-          const effectivePrice = item.price_on_sale ? parseFloat(item.price_on_sale) : parseFloat(item.price) || null;
+          const effectivePrice = item.price_on_sale ? parseFloat(item.price_on_sale) : parseFloat(item.price) || null
           return {
             title: item.title || '—',
             store: item.store || '',
@@ -191,8 +265,8 @@ export default {
             store_weight_g: item.store_weight_g || null,
             price_per_unit: item.price_per_unit || null,
             tender_price_per_unit: item.tender_price_per_unit || null,
-          };
-        }).sort((a, b) => (a.effective_price ?? Infinity) - (b.effective_price ?? Infinity));
+          }
+        }).sort((a, b) => (a.effective_price ?? Infinity) - (b.effective_price ?? Infinity))
 
         return {
           name: tender.name || '',
@@ -201,267 +275,359 @@ export default {
           unit_name: tender.unit_name || null,
           total_price: tender.total_price ? parseFloat(tender.total_price) : null,
           matches,
-        };
-      }).filter((item) => item.name);
-    };
+        }
+      }).filter((item) => item.name)
+    }
 
     const analyzeTender = async () => {
-      isLoading.value = true;
-      error.value = null;
-      analytics.value = null;
+      if (!tenderId.value) return
+      isLoading.value = true
+      error.value = null
+      analytics.value = null
       try {
         const response = await apiClient.get(`/search-tender/${tenderId.value}`, {
           params: { stores: selectedStores.value.join(',') },
-        });
-        analytics.value = processMatchedItems(response.data.matched_items);
+        })
+        analytics.value = processMatchedItems(response.data.matched_items)
       } catch (err) {
-        error.value = err.response?.data?.detail || err.message || 'Помилка сервера';
+        error.value = err.response?.data?.detail || err.message || 'Помилка сервера'
       } finally {
-        isLoading.value = false;
+        isLoading.value = false
       }
-    };
+    }
 
-    const formatPrice = (val) => (val == null ? 'Н/Д' : Number(val).toFixed(2));
+    const formatPrice = (val) => (val == null ? 'Н/Д' : Number(val).toFixed(2))
     const formatWeight = (g) => {
-      if (!g) return '';
-      return g >= 1000 ? (g / 1000).toFixed(g % 1000 === 0 ? 0 : 1) + ' кг' : g + ' г';
-    };
-    const formatDiff = (diff) => diff === null ? '—' : (diff >= 0 ? '+' : '') + diff.toFixed(2) + ' грн';
+      if (!g) return ''
+      return g >= 1000 ? (g / 1000).toFixed(g % 1000 === 0 ? 0 : 1) + ' кг' : g + ' г'
+    }
+    const formatDiff = (diff) => diff === null ? '—' : (diff >= 0 ? '+' : '−') + Math.abs(diff).toFixed(2) + ' ₴'
     const formatPercent = (diff, base) => {
-      if (diff === null || !base) return '—';
-      const pct = (diff / base) * 100;
-      return (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%';
-    };
-    const getDifferenceClass = (diff) =>
-      diff === null ? '' : diff > 0 ? 'price-higher' : diff < 0 ? 'price-lower' : 'price-equal';
+      if (diff === null || !base) return '—'
+      const pct = (diff / base) * 100
+      return (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%'
+    }
+    const diffClass = (diff) =>
+      diff === null ? '' : diff > 0 ? 'price-higher' : diff < 0 ? 'price-lower' : 'price-equal'
 
     return {
       tenderId, analytics, isLoading, error,
       availableStores, selectedStores,
-      hasPricesTender, totalStoreMatches, overallSavings, bestDealStore,
+      hasPricesTender, totalStoreMatches, overallSavings, bestDealStore, coverageLabel,
       analyzeTender,
-      formatPrice, formatWeight, formatDiff, formatPercent, getDifferenceClass,
-    };
+      formatPrice, formatWeight, formatDiff, formatPercent, diffClass,
+    }
   },
-};
+}
 </script>
 
 <style scoped>
-.tender-page {
+.prozorro {
+  padding: calc(var(--header-height) + var(--space-8)) var(--space-6) var(--space-12);
+}
+
+.prozorro__inner {
+  max-width: var(--container-max-width);
+  margin: 0 auto;
+}
+
+.page-header {
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  min-height: 100vh;
-  padding: 2rem;
-  padding-top: 100px;
-}
-
-.tender-container {
-  background: var(--color-surface);
-  padding: 2.5rem;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  max-width: 1100px;
-  width: 100%;
-  text-align: center;
-  font-family: var(--font-body);
-  border: 2px solid var(--color-green-500);
-  color: var(--color-text);
-}
-
-.tender-container h1 {
-  font-size: var(--text-4xl);
-  color: var(--color-heading);
-  margin-bottom: var(--space-4);
-  font-weight: var(--font-bold);
-}
-
-.tender-container p {
-  font-size: var(--text-lg);
-  color: var(--color-text-secondary);
-  margin-bottom: var(--space-6);
-}
-
-form {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-input {
-  width: 100%;
-  padding: 12px;
-  font-size: var(--text-lg);
-  border: 2px dashed var(--color-green-500);
-  border-radius: var(--radius-md);
-  outline: none;
-  transition: background-color var(--transition-base), border-color var(--transition-base);
-  margin-bottom: var(--space-6);
-  text-align: center;
-  color: var(--color-text);
-  background: var(--color-surface);
-}
-
-input:focus {
-  background-color: var(--color-green-50);
-  border-color: var(--color-danger);
-}
-
-.error-message {
-  color: var(--color-danger);
-  font-size: var(--text-lg);
-  margin-top: var(--space-8);
-}
-
-/* Summary cards */
-.summary-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--space-4);
-  margin: var(--space-6) 0 var(--space-8);
+  margin-bottom: var(--space-6);
 }
 
-.summary-card {
-  background: var(--color-gray-50);
+.page-header__title {
+  font-size: clamp(1.75rem, 3vw, 2rem);
+  font-weight: var(--font-semibold);
+  letter-spacing: var(--tracking-display);
+}
+
+.page-header__subtitle {
+  margin-top: 4px;
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+}
+
+.doc-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.doc-link:hover { color: var(--color-heading); }
+
+.search-panel {
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: 1.2rem 1rem;
-  text-align: center;
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  box-shadow: var(--shadow-soft);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
 }
 
-.summary-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+.search-row {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
 }
 
-.summary-icon { font-size: 1.8rem; margin-bottom: 0.3rem; }
-.summary-value { font-size: var(--text-xl); font-weight: var(--font-bold); color: var(--color-heading); margin-bottom: 0.2rem; }
-.summary-label { font-size: var(--text-sm); color: var(--color-text-secondary); font-weight: var(--font-medium); }
+.search-row__input {
+  position: relative;
+  flex: 1;
+  min-width: 240px;
+}
 
-.card-positive .summary-value { color: var(--color-danger); }
-.card-negative .summary-value { color: var(--color-success); }
+.search-row__icon {
+  position: absolute;
+  left: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-tertiary);
+  pointer-events: none;
+}
 
-/* Product groups */
-.results-container { margin-top: var(--space-8); }
-.results-container h2 { font-size: var(--text-3xl); color: var(--color-heading); margin-bottom: var(--space-4); font-weight: var(--font-bold); }
+.app-input--with-icon { padding-left: 34px; }
 
-.product-group { margin-bottom: var(--space-8); text-align: left; }
+.stores-block {
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--color-border);
+}
 
-.product-header {
-  background: var(--color-green-50);
-  border: 1px solid var(--color-green-200);
-  border-radius: var(--radius-md);
+/* Summary */
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+.best-store {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.best-store__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-info);
+}
+
+/* Results */
+.results {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+
+.results__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
-  margin-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  flex-wrap: wrap;
 }
 
-.product-name { font-size: var(--text-base); font-weight: var(--font-bold); color: var(--color-heading); margin-bottom: var(--space-2); }
-.product-meta { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-
-.meta-badge {
-  display: inline-block;
-  padding: 0.25rem 0.7rem;
-  border-radius: var(--radius-full);
-  font-size: var(--text-sm);
+.results__title {
+  font-size: var(--text-md);
   font-weight: var(--font-semibold);
 }
 
-.tender-badge { background: var(--color-info-bg); color: var(--color-info); }
-.qty-badge { background: var(--color-primary-light); color: var(--color-primary); }
-.total-badge { background: var(--color-warning-bg); color: var(--color-warning); }
-
-/* Table */
-.modern-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-family: var(--font-body);
-  margin-bottom: var(--space-2);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  box-shadow: var(--shadow-sm);
-}
-
-.modern-table th {
-  background: var(--color-gray-100);
-  color: var(--color-text-secondary);
-  padding: 10px 14px;
+.results__sub {
+  margin-top: 2px;
   font-size: var(--text-xs);
-  font-weight: var(--font-bold);
-  text-align: center;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  border-bottom: 2px solid var(--color-border);
+  color: var(--color-text-secondary);
 }
 
-.modern-table td {
-  padding: 10px 14px;
-  text-align: center;
-  color: var(--color-text);
+.results__actions { display: flex; gap: var(--space-2); }
+
+.ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 var(--space-3);
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  font-family: inherit;
   font-size: var(--text-sm);
-  font-weight: var(--font-medium);
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+
+.ghost-btn:hover { background: var(--color-bg-subtle); color: var(--color-text); }
+
+.results__groups {
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* Price group */
+.price-group {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.price-group__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--color-border);
   background: var(--color-surface);
-  vertical-align: middle;
+  gap: var(--space-3);
+  flex-wrap: wrap;
 }
 
-.modern-table td a { color: var(--color-info); text-decoration: none; font-weight: var(--font-semibold); }
-.modern-table td a:hover { text-decoration: underline; }
+.price-group__title {
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
+  letter-spacing: 0;
+}
 
-.table-row:hover td { background: var(--color-gray-50); }
-.best-match td { background: var(--color-green-50); }
-.best-match:hover td { background: var(--color-green-100); }
+.price-group__meta {
+  margin-top: 2px;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
 
-.product-title-cell { text-align: left !important; max-width: 320px; }
+.price-group__meta-val { color: var(--color-text); }
+.price-group__meta-sep { margin: 0 6px; color: var(--color-text-tertiary); }
 
-.sale-tag {
-  display: inline-block;
-  background: var(--color-danger-light);
-  color: var(--color-danger);
-  font-size: var(--text-xs);
-  font-weight: var(--font-bold);
-  padding: 1px 6px;
-  border-radius: var(--radius-sm);
-  margin-left: 6px;
-  vertical-align: middle;
+.price-group__empty {
+  padding: var(--space-5);
+  color: var(--color-text-secondary);
+  font-style: italic;
+  font-size: var(--text-sm);
+}
+
+/* Table */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.data-table thead th {
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: var(--font-medium);
   text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.data-table thead th.col-num { text-align: right; }
+.data-table thead th.col-store { width: 160px; }
+.data-table thead th.col-pct { width: 80px; }
+
+.data-table tbody td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+  color: var(--color-text);
+}
+
+.data-table tbody td.col-num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.data-table tr.row-hover:hover td { background: var(--color-bg-subtle); }
+
+.data-table tr.best-row td,
+.data-table tr.best-match td { background: var(--color-green-50); }
+
+.name-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.name-cell a { color: var(--color-primary); }
+.name-cell a:hover { text-decoration: underline; }
+
+.store-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: var(--font-medium);
+}
+
+.store-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-slate-400);
+}
+
+.store-dot.store-rozetka { background: var(--color-info); }
+.store-dot.store-silpo { background: var(--color-primary); }
+.store-dot.store-epicentr { background: var(--color-warning); }
+
+.store-cell__best {
+  margin-top: 2px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--color-primary);
+  font-weight: var(--font-semibold);
 }
 
 .weight-tag {
-  display: inline-block;
-  background: var(--color-info-bg);
-  color: var(--color-info);
-  font-size: var(--text-xs);
-  font-weight: var(--font-bold);
+  display: inline-flex;
+  align-items: center;
   padding: 1px 6px;
   border-radius: var(--radius-sm);
-  margin-left: 6px;
-  vertical-align: middle;
+  background: var(--color-info-bg);
+  color: var(--color-info);
+  font-size: 11px;
+  font-weight: var(--font-semibold);
 }
 
-.normalized-price { font-weight: var(--font-semibold); color: var(--color-text); }
-.normalized-label { display: block; font-size: var(--text-xs); color: var(--color-text-secondary); }
-.no-data { color: var(--color-gray-300); }
-.price-cell { white-space: nowrap; }
-.current-price { font-weight: var(--font-bold); color: var(--color-heading); }
-.old-price { display: block; font-size: var(--text-xs); color: var(--color-text-secondary); text-decoration: line-through; }
-
-.store-badge {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: var(--radius-sm);
-  font-size: var(--text-xs);
-  font-weight: var(--font-bold);
-  white-space: nowrap;
+.old-price {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  text-decoration: line-through;
+  margin-top: 2px;
 }
 
-.store-rozetka { background: var(--color-green-100); color: var(--color-green-700); }
-.store-silpo { background: var(--color-warning-bg); color: var(--color-warning); }
-.store-epicentr { background: var(--color-info-bg); color: var(--color-info); }
+.meta-sub {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
 
-.price-higher { color: var(--color-danger); font-weight: var(--font-bold); background: var(--color-danger-light); border-radius: var(--radius-sm); }
-.price-lower { color: var(--color-success); font-weight: var(--font-bold); background: var(--color-green-50); border-radius: var(--radius-sm); }
-.price-equal { color: var(--color-text-secondary); font-weight: var(--font-bold); background: var(--color-gray-100); border-radius: var(--radius-sm); }
+.dim { color: var(--color-text-tertiary); }
 
-.no-matches { padding: 0.8rem 1.2rem; color: var(--color-text-secondary); font-style: italic; font-size: var(--text-sm); }
+.price-higher { color: var(--color-danger); font-weight: var(--font-medium); }
+.price-lower { color: var(--color-primary); font-weight: var(--font-medium); }
+.price-equal { color: var(--color-text-secondary); }
+
+.empty-hint { margin-top: var(--space-6); }
+
+@media (max-width: 640px) {
+  .prozorro { padding: calc(var(--header-height) + var(--space-6)) var(--space-4) var(--space-10); }
+}
 </style>

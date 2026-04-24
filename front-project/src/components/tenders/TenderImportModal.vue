@@ -1,57 +1,75 @@
 <template>
-  <div class="import-modal-overlay" @click.self="$emit('close')">
-    <div class="import-modal">
-      <div class="modal-header">
-        <h3>Імпорт з Prozorro</h3>
-        <button class="modal-close" @click="$emit('close')">&times;</button>
-      </div>
+  <AppModal v-model="open" title="Імпорт з Prozorro" max-width="520px">
+    <div class="import-body">
+      <p class="import-hint">
+        Введіть ID закупівлі — checkIT завантажить позиції, замовника
+        та документи. Це займе 5–10 секунд.
+      </p>
 
-      <div class="modal-body">
-        <p class="modal-hint">Введіть ID тендера з Prozorro для автоматичного імпорту</p>
-
+      <FormGroup label="ID закупівлі">
         <input
-          class="app-input"
+          class="app-input mono"
           v-model.trim="prozorroId"
-          placeholder="UA-2024-01-01-000001-a або hex ID"
+          placeholder="UA-2024-01-01-000001-a"
           @keydown.enter="handleImport"
         />
+      </FormGroup>
 
-        <div v-if="error" class="modal-error">{{ error }}</div>
+      <div class="alert alert-info import-callout">
+        <AppIcon name="info" :size="14" class="import-callout__icon" />
+        <span>Імпорт додає тендер до вашого списку. Аналіз запускається окремо.</span>
       </div>
 
-      <div class="modal-footer">
-        <AppButton variant="ghost" @click="$emit('close')">Скасувати</AppButton>
-        <AppButton :disabled="!prozorroId || loading" @click="handleImport">
-          {{ loading ? 'Імпортуємо...' : 'Імпортувати' }}
-        </AppButton>
-      </div>
+      <div v-if="error" class="alert alert-error">{{ error }}</div>
     </div>
-  </div>
+
+    <template #footer>
+      <AppButton variant="secondary" @click="close">Скасувати</AppButton>
+      <AppButton :disabled="!prozorroId || loading" :loading="loading" @click="handleImport">
+        Імпортувати
+      </AppButton>
+    </template>
+  </AppModal>
 </template>
 
 <script>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+import AppModal from '@/components/AppModal.vue'
 import AppButton from '@/components/AppButton.vue'
+import AppIcon from '@/components/AppIcon.vue'
+import FormGroup from '@/components/FormGroup.vue'
 import { useTendersStore } from '@/stores/tenders'
 
 export default {
   name: 'TenderImportModal',
-  components: { AppButton },
-  emits: ['close', 'imported'],
-  setup(_, { emit }) {
+  components: { AppModal, AppButton, AppIcon, FormGroup },
+  props: {
+    modelValue: { type: Boolean, default: true },
+  },
+  emits: ['close', 'imported', 'update:modelValue'],
+  setup(props, { emit }) {
     const store = useTendersStore()
+    const open = ref(props.modelValue ?? true)
     const prozorroId = ref('')
     const loading = ref(false)
     const error = ref(null)
 
+    watch(() => props.modelValue, (v) => { open.value = v })
+    watch(open, (v) => {
+      emit('update:modelValue', v)
+      if (!v) emit('close')
+    })
+
+    const close = () => { open.value = false }
+
     const handleImport = async () => {
-      if (!prozorroId.value) return
+      if (!prozorroId.value || loading.value) return
       loading.value = true
       error.value = null
       try {
         const tender = await store.importFromProzorro(prozorroId.value)
         emit('imported', tender)
-        emit('close')
+        close()
       } catch (err) {
         error.value = err.response?.data?.detail || err.message || 'Помилка імпорту'
       } finally {
@@ -59,84 +77,35 @@ export default {
       }
     }
 
-    return { prozorroId, loading, error, handleImport }
+    return { open, prozorroId, loading, error, handleImport, close }
   },
 }
 </script>
 
 <style scoped>
-.import-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+.import-body {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 900;
+  flex-direction: column;
+  gap: var(--space-4);
 }
 
-.import-modal {
-  background: var(--color-surface);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-xl);
-  width: 100%;
-  max-width: 500px;
-  margin: var(--space-4);
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-4) var(--space-5);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.modal-header h3 {
-  font-size: var(--text-lg);
-  font-weight: var(--font-bold);
-  color: var(--color-heading);
+.import-hint {
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+  line-height: 1.55;
   margin: 0;
 }
 
-.modal-close {
-  background: none;
-  border: none;
-  font-size: var(--text-2xl);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  padding: 0;
-  line-height: 1;
-}
-
-.modal-close:hover {
-  color: var(--color-text);
-}
-
-.modal-body {
-  padding: var(--space-5);
-}
-
-.modal-hint {
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-  margin-bottom: var(--space-3);
-}
-
-.modal-error {
-  margin-top: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  background: var(--color-danger-light);
-  color: var(--color-danger);
-  border-radius: var(--radius-md);
-  font-size: var(--text-sm);
-}
-
-.modal-footer {
+.import-callout {
   display: flex;
-  justify-content: flex-end;
+  align-items: flex-start;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-5);
-  border-top: 1px solid var(--color-border);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.import-callout__icon {
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 </style>
