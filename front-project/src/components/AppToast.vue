@@ -5,11 +5,10 @@
         <div
           v-for="toast in toasts"
           :key="toast.id"
-          class="toast"
-          :class="'toast--' + toast.type"
+          :class="['toast', `toast--${toast.type}`]"
           @click="remove(toast.id)"
         >
-          <span class="toast__icon">{{ icons[toast.type] }}</span>
+          <AppIcon :name="iconFor(toast.type)" :size="16" class="toast__icon" />
           <span class="toast__message">{{ toast.message }}</span>
         </div>
       </transition-group>
@@ -19,18 +18,20 @@
 
 <script>
 import { useToast } from '@/composables/useToast'
+import AppIcon from '@/components/AppIcon.vue'
 
 export default {
   name: 'AppToast',
+  components: { AppIcon },
   setup() {
     const { toasts, remove } = useToast()
-    const icons = {
-      success: '\u2713',
-      error: '\u2717',
-      warning: '\u26A0',
-      info: '\u2139',
-    }
-    return { toasts, remove, icons }
+    const iconFor = (type) => ({
+      success: 'check-circle',
+      error: 'alert',
+      warning: 'alert',
+      info: 'info',
+    })[type] || 'info'
+    return { toasts, remove, iconFor }
   },
 }
 </script>
@@ -38,14 +39,14 @@ export default {
 <style scoped>
 .toast-container {
   position: fixed;
-  top: var(--space-4);
+  top: calc(var(--header-height) + var(--space-3));
   right: var(--space-4);
-  z-index: 9000;
+  z-index: 900;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   max-width: 380px;
-  width: 100%;
+  width: calc(100% - var(--space-8));
 }
 
 .toast {
@@ -54,70 +55,46 @@ export default {
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   font-weight: var(--font-medium);
   cursor: pointer;
-  box-shadow: var(--shadow-lg);
-  animation: slide-in 0.3s ease;
+  box-shadow: var(--shadow-pop);
+  border: 1px solid transparent;
+  background: var(--color-surface);
 }
 
 .toast--success {
-  background: var(--color-green-100);
-  color: var(--color-success);
-  border: 1px solid var(--color-green-200);
+  background: var(--color-green-50);
+  color: var(--color-green-700);
+  border-color: var(--color-green-200);
 }
 
 .toast--error {
-  background: var(--color-red-100);
-  color: var(--color-danger);
-  border: 1px solid var(--color-danger-border);
+  background: var(--color-red-50);
+  color: var(--color-red-700);
+  border-color: var(--color-danger-border);
 }
 
 .toast--warning {
   background: var(--color-warning-bg);
   color: var(--color-warning);
-  border: 1px solid var(--color-warning-border);
+  border-color: var(--color-warning-border);
 }
 
 .toast--info {
   background: var(--color-info-bg);
   color: var(--color-info);
-  border: 1px solid var(--color-info-border);
+  border-color: var(--color-info-border);
 }
 
-.toast__icon {
-  font-size: var(--text-lg);
-  flex-shrink: 0;
-}
+.toast__icon { flex-shrink: 0; }
+.toast__message { flex: 1; line-height: 1.4; }
 
-.toast__message {
-  flex: 1;
-  line-height: 1.4;
+.toast-enter-active, .toast-leave-active {
+  transition: all 0.25s ease;
 }
-
-.toast-enter-active,
-.toast-leave-active {
-  transition: all 0.3s ease;
-}
-
-.toast-enter-from {
+.toast-enter-from, .toast-leave-to {
   opacity: 0;
   transform: translateX(60px);
-}
-
-.toast-leave-to {
-  opacity: 0;
-  transform: translateX(60px);
-}
-
-@keyframes slide-in {
-  from {
-    opacity: 0;
-    transform: translateX(60px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
 }
 </style>

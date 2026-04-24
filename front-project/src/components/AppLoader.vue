@@ -1,47 +1,13 @@
 <template>
-  <div v-if="overlay" class="loader-overlay">
+  <div v-if="overlay" class="loader-overlay" role="progressbar" aria-label="Завантаження">
     <div class="loader-content">
-      <div class="swing" aria-busy="true" aria-label="Loading" role="progressbar">
-        <div class="swing-l"></div>
-        <div></div>
-        <div></div>
-        <div></div>
-        <div></div>
-        <div></div>
-        <div class="swing-r"></div>
-      </div>
-      <div class="shadow">
-        <div class="shadow-l"></div>
-        <div></div>
-        <div></div>
-        <div></div>
-        <div></div>
-        <div></div>
-        <div class="shadow-r"></div>
-      </div>
+      <div class="spinner"></div>
       <p v-if="text" class="loader-text">{{ text }}</p>
     </div>
   </div>
-  <div v-else class="loader-inline">
-    <div class="swing" aria-busy="true" aria-label="Loading" role="progressbar">
-      <div class="swing-l"></div>
-      <div></div>
-      <div></div>
-      <div></div>
-      <div></div>
-      <div></div>
-      <div class="swing-r"></div>
-    </div>
-    <div class="shadow">
-      <div class="shadow-l"></div>
-      <div></div>
-      <div></div>
-      <div></div>
-      <div></div>
-      <div></div>
-      <div class="shadow-r"></div>
-    </div>
-    <p v-if="text" class="loader-text loader-text--dark">{{ text }}</p>
+  <div v-else class="loader-inline" role="progressbar" aria-label="Завантаження">
+    <div class="spinner spinner--inline"></div>
+    <p v-if="text" class="loader-text loader-text--inline">{{ text }}</p>
   </div>
 </template>
 
@@ -50,7 +16,7 @@ export default {
   name: 'AppLoader',
   props: {
     overlay: { type: Boolean, default: true },
-    text: { type: String, default: 'Виконується аналіз, це може трішки тривати...' },
+    text: { type: String, default: '' },
   },
 }
 </script>
@@ -58,100 +24,65 @@ export default {
 <style scoped>
 .loader-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 5000;
+  z-index: 700;
 }
 
 .loader-content {
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-8);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  min-width: 220px;
 }
 
 .loader-inline {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: var(--space-8) 0;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-10) 0;
 }
 
-.swing div {
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 2.5px solid var(--color-border);
+  border-top-color: var(--color-primary);
   border-radius: 50%;
-  float: left;
-  height: 1.5em;
-  width: 1.5em;
-  margin: 0 0.3em;
+  animation: spin 0.8s linear infinite;
 }
 
-.swing div:nth-of-type(1) { background: linear-gradient(to right, #1aad3f, #22c54e); }
-.swing div:nth-of-type(2) { background: linear-gradient(to right, #22c54e, #4ade80); }
-.swing div:nth-of-type(3) { background: linear-gradient(to right, #4ade80, #86efac); }
-.swing div:nth-of-type(4) { background: linear-gradient(to right, #86efac, #bfcf9c); }
-.swing div:nth-of-type(5) { background: linear-gradient(to right, #bfcf9c, #e8c5be); }
-.swing div:nth-of-type(6) { background: linear-gradient(to right, #e8c5be, #f87171); }
-.swing div:nth-of-type(7) { background: linear-gradient(to right, #f87171, #c41a12); }
-
-.shadow {
-  clear: left;
-  padding-top: 1.5em;
-  text-align: center;
+.spinner--inline {
+  width: 24px;
+  height: 24px;
+  border-width: 2px;
 }
 
-.shadow div {
-  filter: blur(1px);
-  float: left;
-  width: 1.5em;
-  height: 0.25em;
-  border-radius: 50%;
-  background: var(--color-gray-300);
-  margin: 0 0.3em;
-}
-
-.shadow .shadow-l { background: var(--color-gray-200); }
-.shadow .shadow-r { background: var(--color-gray-400); }
-
-.swing-l { animation: ball-l 0.425s ease-in-out infinite alternate; }
-.swing-r { animation: ball-r 0.425s ease-in-out infinite alternate; }
-.shadow-l { animation: shadow-l-n 0.425s ease-in-out infinite alternate; }
-.shadow-r { animation: shadow-r-n 0.425s ease-in-out infinite alternate; }
-
-@keyframes ball-l {
-  0%, 50% { transform: rotate(0) translateX(0); }
-  100% { transform: rotate(50deg) translateX(-2.5em); }
-}
-
-@keyframes ball-r {
-  0% { transform: rotate(-50deg) translateX(2.5em); }
-  50%, 100% { transform: rotate(0) translateX(0); }
-}
-
-@keyframes shadow-l-n {
-  0%, 50% { opacity: 0.5; transform: translateX(0); }
-  100% { opacity: 0.125; transform: translateX(-1.75em); }
-}
-
-@keyframes shadow-r-n {
-  0% { opacity: 0.125; transform: translateX(1.75em); }
-  50%, 100% { opacity: 0.5; transform: translateX(0); }
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .loader-text {
-  color: var(--color-white);
-  font-size: var(--text-lg);
-  margin-top: var(--space-8);
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  color: var(--color-text);
+  font-size: var(--text-base);
   text-align: center;
+  max-width: 320px;
+  line-height: 1.5;
 }
 
-.loader-text--dark {
+.loader-text--inline {
   color: var(--color-text-secondary);
-  text-shadow: none;
 }
 </style>

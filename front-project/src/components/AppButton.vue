@@ -1,11 +1,14 @@
 <template>
   <button
-    :class="['app-btn', 'app-btn--' + variant, 'app-btn--' + size]"
+    :class="['app-btn', `app-btn--${variant}`, `app-btn--${size}`, { 'app-btn--icon': iconOnly }]"
     :disabled="disabled || loading"
+    :type="type"
     v-bind="$attrs"
   >
-    <span v-if="loading" class="app-btn__spinner"></span>
+    <span v-if="loading" class="app-btn__spinner" aria-hidden="true"></span>
+    <slot v-else name="icon-left"></slot>
     <slot />
+    <slot name="icon-right"></slot>
   </button>
 </template>
 
@@ -24,8 +27,10 @@ export default {
       default: 'md',
       validator: (v) => ['sm', 'md', 'lg'].includes(v),
     },
+    type: { type: String, default: 'button' },
     loading: { type: Boolean, default: false },
     disabled: { type: Boolean, default: false },
+    iconOnly: { type: Boolean, default: false },
   },
 }
 </script>
@@ -36,77 +41,96 @@ export default {
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  border: none;
   border-radius: var(--radius-md);
   font-family: var(--font-body);
-  font-weight: var(--font-semibold);
+  font-weight: var(--font-medium);
   cursor: pointer;
-  transition: background var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
   white-space: nowrap;
+  border: 1px solid transparent;
+  transition: background var(--transition-fast),
+              border-color var(--transition-fast),
+              color var(--transition-fast);
+  line-height: 1;
 }
 
 .app-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  transform: none !important;
 }
 
 /* Sizes */
 .app-btn--sm {
-  padding: var(--space-1) var(--space-3);
+  height: 28px;
+  padding: 0 var(--space-3);
   font-size: var(--text-sm);
 }
 
 .app-btn--md {
-  padding: var(--space-2) var(--space-5);
+  height: 36px;
+  padding: 0 var(--space-4);
   font-size: var(--text-base);
 }
 
 .app-btn--lg {
-  padding: var(--space-3) var(--space-8);
-  font-size: var(--text-lg);
+  height: 44px;
+  padding: 0 var(--space-5);
+  font-size: var(--text-md);
 }
+
+.app-btn--icon {
+  padding: 0;
+  width: var(--btn-icon-size, 36px);
+}
+
+.app-btn--sm.app-btn--icon { width: 28px; }
+.app-btn--lg.app-btn--icon { width: 44px; }
 
 /* Variants */
 .app-btn--primary {
-  background: linear-gradient(135deg, var(--color-green-500), var(--color-green-600));
+  background: var(--color-primary);
   color: var(--color-white);
+  border-color: var(--color-primary);
 }
 
 .app-btn--primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, var(--color-green-600), var(--color-green-700));
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}
+
+[data-theme="dark"] .app-btn--primary {
+  color: #052e1b;
 }
 
 .app-btn--secondary {
-  background: var(--color-white);
+  background: var(--color-surface);
   color: var(--color-text);
-  border: 1px solid var(--color-border);
+  border-color: var(--color-border);
 }
 
 .app-btn--secondary:hover:not(:disabled) {
-  background: var(--color-gray-50);
+  background: var(--color-bg-subtle);
   border-color: var(--color-border-hover);
 }
 
 .app-btn--danger {
-  background: var(--color-danger);
-  color: var(--color-white);
+  background: var(--color-surface);
+  color: var(--color-danger);
+  border-color: var(--color-border);
 }
 
 .app-btn--danger:hover:not(:disabled) {
-  background: var(--color-red-600);
-  transform: translateY(-1px);
+  background: var(--color-danger-light);
+  border-color: var(--color-danger-border);
 }
 
 .app-btn--ghost {
   background: transparent;
   color: var(--color-text-secondary);
+  border-color: transparent;
 }
 
 .app-btn--ghost:hover:not(:disabled) {
-  background: var(--color-gray-100);
+  background: var(--color-bg-subtle);
   color: var(--color-text);
 }
 

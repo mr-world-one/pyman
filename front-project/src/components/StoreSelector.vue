@@ -1,31 +1,37 @@
 <template>
   <div class="store-selector">
-    <label v-if="label" class="store-selector__label">{{ label }}</label>
+    <div v-if="label" class="store-selector__label">{{ label }}</div>
     <div class="store-selector__list">
       <label
         v-for="store in stores"
         :key="store.key"
-        class="store-selector__item"
+        :class="['store-chip', `store-chip--${store.key}`, { 'is-active': modelValue.includes(store.key) }]"
       >
         <input
           type="checkbox"
           :value="store.key"
           :checked="modelValue.includes(store.key)"
+          class="store-chip__input"
           @change="toggle(store.key)"
         />
-        {{ store.name }}
+        <span class="store-chip__dot" aria-hidden="true"></span>
+        <span class="store-chip__name">{{ store.name }}</span>
+        <AppIcon v-if="modelValue.includes(store.key)" name="check" :size="14" class="store-chip__check" />
       </label>
     </div>
   </div>
 </template>
 
 <script>
+import AppIcon from '@/components/AppIcon.vue'
+
 export default {
   name: 'StoreSelector',
+  components: { AppIcon },
   props: {
     modelValue: { type: Array, required: true },
     stores: { type: Array, required: true },
-    label: { type: String, default: 'Оберіть магазини для порівняння:' },
+    label: { type: String, default: 'Магазини для звірки' },
   },
   emits: ['update:modelValue'],
   setup(props, { emit }) {
@@ -42,47 +48,69 @@ export default {
 
 <style scoped>
 .store-selector {
-  margin: var(--space-6) 0;
-  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
 .store-selector__label {
-  font-size: var(--text-base);
-  font-weight: var(--font-semibold);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
   color: var(--color-text);
-  display: block;
-  margin-bottom: var(--space-2);
 }
 
 .store-selector__list {
   display: flex;
-  gap: var(--space-3);
   flex-wrap: wrap;
-  justify-content: center;
+  gap: var(--space-2);
 }
 
-.store-selector__item {
-  display: flex;
+.store-chip {
+  display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  font-weight: var(--font-medium);
-  cursor: pointer;
-  padding: var(--space-2) var(--space-3);
+  height: 36px;
+  padding: 0 var(--space-3);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  transition: background var(--transition-fast), border-color var(--transition-fast);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
   font-size: var(--text-sm);
   color: var(--color-text);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+  user-select: none;
 }
 
-.store-selector__item:hover {
+.store-chip:hover:not(.is-active) {
+  background: var(--color-bg-subtle);
+  border-color: var(--color-border-hover);
+}
+
+.store-chip.is-active {
   background: var(--color-green-50);
   border-color: var(--color-green-200);
+  color: var(--color-green-700);
 }
 
-.store-selector__item input[type='checkbox'] {
-  width: auto;
-  margin: 0;
-  accent-color: var(--color-primary);
+.store-chip__input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.store-chip__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-slate-400);
+  flex-shrink: 0;
+}
+
+.store-chip--rozetka .store-chip__dot { background: var(--color-info); }
+.store-chip--silpo .store-chip__dot { background: var(--color-primary); }
+.store-chip--epicentr .store-chip__dot { background: var(--color-warning); }
+
+.store-chip__check {
+  color: currentColor;
 }
 </style>

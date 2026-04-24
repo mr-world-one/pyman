@@ -13,8 +13,9 @@ export default {
 <style scoped>
 .card-panel {
   background: var(--color-surface);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-soft);
   padding: var(--space-8);
   width: 100%;
 }
