@@ -195,7 +195,7 @@ import FormGroup from '@/components/FormGroup.vue'
 import EmptyState from '@/components/EmptyState.vue'
 
 export default {
-  name: 'Prozorro',
+  name: 'ProzorroView',
   components: { AppButton, AppLoader, AppIcon, AppBadge, StoreSelector, StatCard, FormGroup, EmptyState },
   setup() {
     const tenderId = ref('')
