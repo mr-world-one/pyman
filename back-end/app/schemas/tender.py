@@ -130,7 +130,8 @@ class TenderItemResponse(BaseModel):
     name: str
     quantity: float
     unit_name: str
-    unit_price: float
+    unit_price: Optional[float] = None
+    price_source: str = "tender"
     # Product
     dk_code: Optional[str] = None
     brand: Optional[str] = None

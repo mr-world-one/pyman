@@ -79,7 +79,19 @@ async def init_db():
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
             logger.info("Database tables created successfully")
-            
+
+            # Lightweight idempotent migrations for schema changes that
+            # `create_all` cannot perform on existing tables.
+            await conn.exec_driver_sql(
+                "ALTER TABLE tender_items "
+                "ADD COLUMN IF NOT EXISTS price_source VARCHAR(20) "
+                "NOT NULL DEFAULT 'tender'"
+            )
+            await conn.exec_driver_sql(
+                "ALTER TABLE tender_items ALTER COLUMN unit_price DROP NOT NULL"
+            )
+            logger.info("Schema migrations applied")
+
         return engine
     except Exception as e:
         logger.error(f"Database initialization failed: {str(e)}")

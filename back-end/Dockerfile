@@ -1,10 +1,11 @@
 FROM python:3.11-slim
 
-# System deps: OCR tools
+# System deps: OCR tools + LibreOffice (for .doc conversion)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     tesseract-ocr-ukr \
     tesseract-ocr-eng \
+    libreoffice-writer \
     libffi-dev \
     libpq-dev \
     gcc \
@@ -31,6 +32,9 @@ RUN pip install --no-cache-dir email-validator
 
 # Google Gemini API for LLM-based product validation
 RUN pip install --no-cache-dir google-generativeai
+
+# Anthropic SDK for Claude (primary LLM with prompt caching)
+RUN pip install --no-cache-dir anthropic
 
 # Redis async client for caching
 RUN pip install --no-cache-dir "redis>=5.0.0"

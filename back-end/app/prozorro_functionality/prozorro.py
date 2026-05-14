@@ -3,6 +3,7 @@ import io
 import logging
 import os
 import shutil
+import subprocess
 import tempfile
 from typing import Any, Dict, List
 
@@ -33,6 +34,7 @@ def get_contract(contract_id):
 _SUPPORTED_FORMATS = {
     'application/pdf': 'pdf',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    'application/msword': 'doc',
 }
 
 
@@ -176,9 +178,9 @@ async def _extract_text_all_pages(pdf_content: bytes) -> str:
 
 
 async def parse_documents(document_refs: List[tuple]) -> List[Dict[str, Any]]:
-    """Download PDFs/DOCX, extract text, and use LLM to extract items.
+    """Download PDFs/DOCX/DOC, extract text, and use LLM to extract items.
 
-    document_refs: list of (url, doc_type) where doc_type is 'pdf' or 'docx'.
+    document_refs: list of (url, doc_type) where doc_type is 'pdf', 'docx', or 'doc'.
     """
     all_text = []
     for url, doc_type in document_refs:
@@ -189,6 +191,9 @@ async def parse_documents(document_refs: List[tuple]) -> List[Dict[str, Any]]:
                 text = await _extract_text_all_pages(response.content)
             elif doc_type == 'docx':
                 text = extract_text_from_docx(response.content)
+            elif doc_type == 'doc':
+                pdf_bytes = await asyncio.to_thread(convert_doc_to_pdf, response.content)
+                text = await _extract_text_all_pages(pdf_bytes)
             else:
                 continue
             if text.strip():
@@ -206,6 +211,44 @@ async def parse_documents(document_refs: List[tuple]) -> List[Dict[str, Any]]:
         raise Exception("LLM failed to extract items from document text")
 
     return items
+
+
+def convert_doc_to_pdf(doc_content: bytes) -> bytes:
+    """Convert a legacy .doc file to PDF bytes via LibreOffice headless.
+
+    Raises an exception if soffice is unavailable or conversion fails.
+    """
+    work_dir = tempfile.mkdtemp(prefix="pyman_doc_")
+    try:
+        src = os.path.join(work_dir, "input.doc")
+        with open(src, "wb") as f:
+            f.write(doc_content)
+
+        result = subprocess.run(
+            [
+                "soffice",
+                "--headless",
+                "--convert-to", "pdf",
+                "--outdir", work_dir,
+                src,
+            ],
+            capture_output=True,
+            timeout=120,
+        )
+        if result.returncode != 0:
+            raise Exception(
+                f"LibreOffice conversion failed (code {result.returncode}): "
+                f"{result.stderr.decode('utf-8', errors='ignore')[:300]}"
+            )
+
+        pdf_path = os.path.join(work_dir, "input.pdf")
+        if not os.path.exists(pdf_path):
+            raise Exception("LibreOffice did not produce a PDF output")
+
+        with open(pdf_path, "rb") as f:
+            return f.read()
+    finally:
+        shutil.rmtree(work_dir, ignore_errors=True)
 
 
 def validate_name(name, max_elements=2):

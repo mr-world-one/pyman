@@ -66,7 +66,13 @@ class TenderItem(Base):
     name = Column(String(500), nullable=False)
     quantity = Column(Float, nullable=False)
     unit_name = Column(String(50), nullable=False)
-    unit_price = Column(Float, nullable=False)
+    unit_price = Column(Float, nullable=True)
+    # How unit_price was determined:
+    #   'tender'          — taken from Prozorro items[].unit.value.amount or the tender document
+    #   'market_estimate' — inferred from live store prices (proxy), because the document had no unit price
+    #   'manual'          — user entered the price by hand
+    #   'unknown'         — no price available; shown as "—" in UI, excluded from risk analysis
+    price_source = Column(String(20), nullable=False, default="tender", server_default="tender")
 
     # Product-specific
     dk_code = Column(String(50), nullable=True)

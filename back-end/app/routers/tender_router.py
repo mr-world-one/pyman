@@ -253,11 +253,67 @@ async def import_from_prozorro(
     # Classify type using LLM (async)
     tender_type = await classify_tender_type_async(raw_items)
 
+    # Helper — coerce LLM output (None, '', ' ', numeric strings with comma) to float
+    def _safe_float(value, default=0.0):
+        if value is None:
+            return default
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            stripped = value.strip().replace(",", ".")
+            if not stripped:
+                return default
+            try:
+                return float(stripped)
+            except ValueError:
+                return default
+        return default
+
+    def _price_from_raw(raw):
+        """Return (unit_price, source) tuple from a raw tender-item dict.
+
+        source == 'tender' when the raw dict carried a usable unit price,
+        source == None     when nothing usable was supplied (caller decides fallback).
+        """
+        raw_price = raw.get("unit_price")
+        # Filter out Prozorro sentinel ' ' that means "not specified" and any 0/None
+        if isinstance(raw_price, str) and raw_price.strip() == "":
+            return None, None
+        price = _safe_float(raw_price, default=0.0)
+        return (price, "tender") if price > 0 else (None, None)
+
+    async def _market_estimate(name: str):
+        """Search the market for a proxy unit price. Returns float median or None."""
+        if not name:
+            return None
+        try:
+            from app.services.parser_service import search_products_async
+            import statistics
+
+            products = await search_products_async(
+                product_name=name,
+                stores=["rozetka", "silpo", "epicentr"],
+                n=3,
+                fast_parse=True,
+                ignore_price_format=False,
+            )
+            prices = []
+            for p in products:
+                raw = p.get("price_on_sale") or p.get("price")
+                val = _safe_float(raw)
+                if val > 0:
+                    prices.append(val)
+            if not prices:
+                return None
+            return round(statistics.median(prices), 2)
+        except Exception as e:
+            logger.warning(f"Market estimate failed for '{name[:60]}': {e}")
+            return None
+
     # Calculate total
     total_amount = sum(
-        float(item.get("unit_price", 0)) * float(item.get("quantity", 1))
+        _safe_float(item.get("unit_price")) * _safe_float(item.get("quantity"), default=1.0)
         for item in raw_items
-        if item.get("unit_price") and item.get("unit_price") != " "
     )
     if not total_amount:
         total_amount = contract.get("value", {}).get("amount", 0)
@@ -277,17 +333,32 @@ async def import_from_prozorro(
         user_id=user_id,
     )
 
-    # Build items
+    # Build items with 3-step price fallback:
+    #   1. tender document / Prozorro JSON  → price_source = 'tender'
+    #   2. live market median (proxy)       → price_source = 'market_estimate'
+    #   3. nothing usable                   → price = None, source = 'unknown'
+    fallback_stats = {"tender": 0, "market_estimate": 0, "unknown": 0}
     for raw in raw_items:
-        unit_price = raw.get("unit_price", 0)
-        if unit_price == " ":
-            unit_price = 0
+        name = raw.get("name") or ""
+        price, source = _price_from_raw(raw)
+
+        if source is None:
+            estimated = await _market_estimate(name)
+            if estimated is not None:
+                price = estimated
+                source = "market_estimate"
+            else:
+                price = None
+                source = "unknown"
+
+        fallback_stats[source] += 1
 
         item = TenderItem(
-            name=raw.get("name", ""),
-            quantity=float(raw.get("quantity", 1)),
-            unit_name=raw.get("unit_name", "од."),
-            unit_price=float(unit_price),
+            name=name,
+            quantity=_safe_float(raw.get("quantity"), default=1.0),
+            unit_name=raw.get("unit_name") or "од.",
+            unit_price=price,
+            price_source=source,
         )
 
         # Set type-specific fields based on classification
@@ -298,13 +369,26 @@ async def import_from_prozorro(
 
         tender.items.append(item)
 
+    # If tender.total_amount was derived from per-item prices but some items
+    # were filled from market estimates, recalculate so the aggregate reflects
+    # whatever data we ended up with. Estimates are already numeric.
+    if tender.total_amount in (0, 0.0, None):
+        total_amount = sum(
+            (it.unit_price or 0) * (it.quantity or 0) for it in tender.items
+        )
+        if total_amount:
+            tender.total_amount = total_amount
+
     db.add(tender)
     await db.commit()
     await db.refresh(tender)
 
     logger.info(
         f"Imported tender #{tender.id} from Prozorro ({prozorro_id}), "
-        f"type={tender_type.value}, items={len(tender.items)}"
+        f"type={tender_type.value}, items={len(tender.items)}, "
+        f"price_sources=tender:{fallback_stats['tender']}/"
+        f"market:{fallback_stats['market_estimate']}/"
+        f"unknown:{fallback_stats['unknown']}"
     )
     return tender
 
