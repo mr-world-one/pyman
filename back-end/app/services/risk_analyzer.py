@@ -9,6 +9,7 @@ Provides:
 
 import json
 import logging
+import os
 import re
 import statistics
 from typing import Any, Dict, List, Optional
@@ -35,6 +36,35 @@ def calculate_price_deviation(
         tender_item = group.get("tender_item", {})
         matches = group.get("matches", [])
         item_name = tender_item.get("name", "")
+        price_source = tender_item.get("price_source", "tender")
+
+        # Market-estimated prices are themselves derived from store listings, so
+        # comparing them against the store median is tautological. Skip them
+        # from risk scoring but keep a visible placeholder in the breakdown so
+        # the UI can show why no score was computed.
+        if price_source == "market_estimate":
+            results.append({
+                "item_name": item_name,
+                "tender_price": tender_item.get("unit_price"),
+                "median_market_price": None,
+                "deviation_pct": None,
+                "risk_level": "excluded",
+                "price_source": price_source,
+                "reason": "Ціна оцінена з ринку — виключено з ризик-аналізу",
+            })
+            continue
+
+        if price_source == "unknown":
+            results.append({
+                "item_name": item_name,
+                "tender_price": None,
+                "median_market_price": None,
+                "deviation_pct": None,
+                "risk_level": "excluded",
+                "price_source": price_source,
+                "reason": "Ціна не вказана — виключено з ризик-аналізу",
+            })
+            continue
 
         tender_price = None
         raw = tender_item.get("unit_price")
@@ -124,24 +154,44 @@ def calculate_price_deviation(
 
 
 async def analyze_discriminatory_requirements(specification_text: str) -> Optional[Dict[str, Any]]:
-    """Use Gemini to detect potentially discriminatory requirements in tender specs.
+    """Detect potentially discriminatory requirements in tender specs.
 
-    Looks for requirements that may point to a specific supplier, such as:
+    Tries Claude first; falls back to Gemini on failure / unavailability.
+    Looks for requirements that may point to a specific supplier:
     - Overly specific brand/model requirements
     - Unique technical parameters only one vendor satisfies
     - Unusual packaging, color, or certification requirements
 
-    Returns dict with findings or None if Gemini is unavailable.
+    Returns dict with findings or None if all LLMs are unavailable.
     """
-    from app.services.llm_validator import _get_model, _parse_response
+    if not specification_text or len(specification_text.strip()) < 50:
+        return {
+            "discriminatory_requirements": [],
+            "summary": "Текст специфікації занадто короткий для аналізу",
+            "overall_risk": "low",
+        }
+
+    # Primary: Claude (cached system prompt)
+    if os.getenv("ANTHROPIC_API_KEY", "").strip():
+        from app.services import claude_validator
+        result = await claude_validator.analyze_discriminatory_requirements(
+            specification_text
+        )
+        if result is not None:
+            return result
+        logger.info(
+            "Claude discriminatory analysis returned None — falling back to Gemini"
+        )
+
+    # Fallback: Gemini (legacy path)
+    from app.services.gemini_validator import _get_model
 
     model = _get_model()
     if not model:
-        logger.warning("Gemini not configured — discriminatory requirement analysis skipped")
+        logger.warning(
+            "Neither Claude nor Gemini available — discriminatory analysis skipped"
+        )
         return None
-
-    if not specification_text or len(specification_text.strip()) < 50:
-        return {"discriminatory_requirements": [], "summary": "Текст специфікації занадто короткий для аналізу"}
 
     prompt = f"""Ти — експерт з аналізу тендерної документації в Україні на предмет можливих корупційних ризиків.
 
@@ -179,7 +229,6 @@ async def analyze_discriminatory_requirements(specification_text: str) -> Option
         response = await model.generate_content_async(prompt)
         logger.info(f"Gemini discriminatory analysis response: {response.text[:300]}")
 
-        # Try to parse JSON
         try:
             data = json.loads(response.text)
             if isinstance(data, dict):
@@ -187,8 +236,7 @@ async def analyze_discriminatory_requirements(specification_text: str) -> Option
         except json.JSONDecodeError:
             pass
 
-        # Fallback: extract JSON object from text
-        match = re.search(r'\{.*\}', response.text, re.DOTALL)
+        match = re.search(r"\{.*\}", response.text, re.DOTALL)
         if match:
             try:
                 data = json.loads(match.group())
@@ -197,7 +245,9 @@ async def analyze_discriminatory_requirements(specification_text: str) -> Option
             except json.JSONDecodeError:
                 pass
 
-        logger.warning(f"Could not parse discriminatory analysis response: {response.text[:200]}")
+        logger.warning(
+            f"Could not parse Gemini discriminatory analysis: {response.text[:200]}"
+        )
         return None
 
     except Exception as e:
@@ -205,28 +255,122 @@ async def analyze_discriminatory_requirements(specification_text: str) -> Option
         return None
 
 
+def calculate_aggregate_risk(
+    matched_items: List[Dict[str, Any]],
+    tender_total: Optional[float],
+) -> Optional[Dict[str, Any]]:
+    """Compare the tender's headline budget against the sum of market estimates.
+
+    Useful when individual unit prices are missing from the document and the
+    only signal we have is the global ``total_amount`` / ``expected_cost``.
+    Returns a single risk record describing how the tender budget aligns with
+    the market — or ``None`` if there's no usable budget or no market data.
+    """
+    if not tender_total or tender_total <= 0:
+        return None
+
+    market_total = 0.0
+    items_with_estimate = 0
+    items_total = 0
+    for group in matched_items:
+        items_total += 1
+        tender_item = group.get("tender_item", {})
+        matches = group.get("matches", [])
+        try:
+            qty = float(tender_item.get("quantity") or 0)
+        except (ValueError, TypeError):
+            qty = 0
+        if qty <= 0:
+            continue
+        # Build a price for this item: prefer the cheapest validated match
+        prices = []
+        for m in matches:
+            ep = m.get("price_on_sale") or m.get("price")
+            try:
+                if ep is not None:
+                    prices.append(float(ep))
+            except (ValueError, TypeError):
+                pass
+        if not prices:
+            continue
+        items_with_estimate += 1
+        market_total += statistics.median(prices) * qty
+
+    if market_total <= 0 or items_with_estimate == 0:
+        return None
+
+    coverage = items_with_estimate / items_total if items_total else 0
+    deviation_pct = round((tender_total - market_total) / market_total * 100, 1)
+    if abs(deviation_pct) > 25:
+        risk_level = "high"
+    elif abs(deviation_pct) > 12:
+        risk_level = "medium"
+    else:
+        risk_level = "low"
+
+    if deviation_pct > 0:
+        reason = (
+            f"Тендерний бюджет на {abs(deviation_pct)}% вищий за сумарну "
+            f"ринкову оцінку"
+        )
+    elif deviation_pct < 0:
+        reason = (
+            f"Тендерний бюджет на {abs(deviation_pct)}% нижчий за сумарну "
+            f"ринкову оцінку"
+        )
+    else:
+        reason = "Тендерний бюджет співпадає з ринковою оцінкою"
+
+    return {
+        "tender_total": round(tender_total, 2),
+        "market_total": round(market_total, 2),
+        "deviation_pct": deviation_pct,
+        "risk_level": risk_level,
+        "items_with_estimate": items_with_estimate,
+        "items_total": items_total,
+        "coverage_pct": round(coverage * 100, 1),
+        "reason": reason,
+    }
+
+
 def calculate_overall_risk_score(
     price_risks: List[Dict[str, Any]],
     discriminatory_analysis: Optional[Dict[str, Any]] = None,
+    aggregate_risk: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Calculate an overall risk score (0-100) based on price and discriminatory analyses.
 
     Scoring:
     - Price deviation contributes up to 50 points
     - Discriminatory requirements contribute up to 50 points
+    - When per-item prices are missing, falls back to ``aggregate_risk`` —
+      the tender budget vs. the sum of market estimates.
 
     Returns a summary dict with score, level, and breakdown.
     """
     price_score = 0
+    excluded_count = 0
     if price_risks:
         high_count = sum(1 for r in price_risks if r.get("risk_level") == "high")
         medium_count = sum(1 for r in price_risks if r.get("risk_level") == "medium")
         total_assessed = sum(1 for r in price_risks if r.get("risk_level") in ("high", "medium", "low"))
+        excluded_count = sum(1 for r in price_risks if r.get("risk_level") == "excluded")
 
         if total_assessed > 0:
             price_score = min(50, round(
                 (high_count * 50 + medium_count * 25) / total_assessed
             ))
+
+    # Fallback: if we have no per-item assessment at all, derive the price
+    # score from the aggregate budget vs. market estimate.
+    if price_score == 0 and aggregate_risk:
+        agg_level = aggregate_risk.get("risk_level")
+        if agg_level == "high":
+            price_score = 40
+        elif agg_level == "medium":
+            price_score = 20
+        elif agg_level == "low":
+            price_score = 5
 
     discrim_score = 0
     if discriminatory_analysis:
@@ -257,8 +401,10 @@ def calculate_overall_risk_score(
         "risk_level": level,
         "price_risk_score": price_score,
         "discriminatory_risk_score": discrim_score,
+        "excluded_items_count": excluded_count,
         "breakdown": {
             "price_deviations": price_risks,
             "discriminatory_analysis": discriminatory_analysis,
+            "aggregate_risk": aggregate_risk,
         },
     }

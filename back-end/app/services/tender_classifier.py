@@ -57,12 +57,11 @@ def _classify_by_regex(items: List[Dict[str, Any]]) -> TenderType:
 
 
 async def _classify_by_llm(items: List[Dict[str, Any]]) -> Optional[TenderType]:
-    """Use Gemini to semantically classify tender type from item names and CPV codes."""
-    from app.services.llm_validator import _get_model
+    """Use an LLM to semantically classify tender type from item names and CPV codes.
 
-    model = _get_model()
-    if not model:
-        return None
+    Tries Claude first; falls back to Gemini if Claude is unavailable.
+    """
+    import os
 
     # Build item descriptions for the prompt
     items_text = ""
@@ -77,7 +76,7 @@ async def _classify_by_llm(items: List[Dict[str, Any]]) -> Optional[TenderType]:
     if not items_text.strip():
         return None
 
-    prompt = f"""Ти — експерт з класифікації тендерних закупівель в Україні.
+    system_prompt = """Ти — експерт з класифікації тендерних закупівель в Україні.
 
 ЗАДАЧА: Визнач тип тендера на основі переліку товарів/послуг/робіт.
 
@@ -94,23 +93,66 @@ async def _classify_by_llm(items: List[Dict[str, Any]]) -> Optional[TenderType]:
 - CPV 70-79: послуги (нерухомість, IT, юридичні тощо)
 - CPV 09-43: товари
 
-Перелік позицій тендера:
-{items_text}
-
 Відповідай ТІЛЬКИ одним словом з варіантів: product, service, work, mixed"""
+
+    type_map = {
+        "product": TenderType.PRODUCT,
+        "service": TenderType.SERVICE,
+        "work": TenderType.WORK,
+        "mixed": TenderType.MIXED,
+    }
+
+    # ── Primary: Claude ────────────────────────────────────────────────
+    if os.getenv("ANTHROPIC_API_KEY", "").strip():
+        try:
+            from app.services import claude_validator
+
+            client = claude_validator._get_client()
+            if client is not None:
+                msg = await client.messages.create(
+                    model=claude_validator._model(),
+                    max_tokens=10,
+                    system=[
+                        {
+                            "type": "text",
+                            "text": system_prompt,
+                            "cache_control": {"type": "ephemeral"},
+                        }
+                    ],
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": f"Перелік позицій тендера:\n{items_text}",
+                        }
+                    ],
+                )
+                result_text = "".join(
+                    b.text for b in msg.content if getattr(b, "type", None) == "text"
+                ).strip().lower().strip('"\'.,! ')
+                logger.info(f"Claude classification result: '{result_text}'")
+                mapped = type_map.get(result_text)
+                if mapped is not None:
+                    return mapped
+                logger.info("Claude returned non-mapped value — falling back to Gemini")
+        except Exception as e:
+            logger.warning(f"Claude classification failed — falling back to Gemini: {e}")
+
+    # ── Fallback: Gemini ───────────────────────────────────────────────
+    from app.services.gemini_validator import _get_model
+
+    model = _get_model()
+    if not model:
+        return None
+
+    prompt = f"""{system_prompt}
+
+Перелік позицій тендера:
+{items_text}"""
 
     try:
         response = await model.generate_content_async(prompt)
         result_text = response.text.strip().lower().strip('"\'.,! ')
         logger.info(f"Gemini classification result: '{result_text}'")
-
-        type_map = {
-            "product": TenderType.PRODUCT,
-            "service": TenderType.SERVICE,
-            "work": TenderType.WORK,
-            "mixed": TenderType.MIXED,
-        }
-
         return type_map.get(result_text)
     except Exception as e:
         logger.warning(f"Gemini classification failed: {e}")
