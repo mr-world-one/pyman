@@ -22,7 +22,11 @@
             <td>{{ item.work_type || '—' }}</td>
             <td class="num col-num">{{ item.quantity }}</td>
             <td>{{ item.unit_name }}</td>
-            <td class="num col-num">{{ formatPrice(item.unit_price) }}</td>
+            <td class="num col-num">
+              <span v-if="item.unit_price != null">{{ formatPrice(item.unit_price) }}</span>
+              <span v-else class="dim">—</span>
+              <PriceSourceBadge :source="item.price_source" />
+            </td>
             <td>{{ item.object_address || '—' }}</td>
             <td>{{ item.estimated_duration_days ? item.estimated_duration_days + ' дн.' : '—' }}</td>
           </tr>
@@ -33,8 +37,11 @@
 </template>
 
 <script>
+import PriceSourceBadge from '@/components/tenders/PriceSourceBadge.vue'
+
 export default {
   name: 'WorkTenderDetail',
+  components: { PriceSourceBadge },
   props: { items: { type: Array, required: true } },
   methods: {
     formatPrice(val) {
@@ -90,4 +97,6 @@ export default {
 .data-table tr.row-hover:hover td { background: var(--color-bg-subtle); }
 
 .name-cell { max-width: 360px; color: var(--color-heading); font-weight: var(--font-medium); }
+
+.dim { color: var(--color-text-tertiary); }
 </style>

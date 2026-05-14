@@ -220,6 +220,52 @@
               </div>
             </div>
 
+            <!-- Aggregate budget vs market summary (when per-item prices missing) -->
+            <div
+              v-if="riskResult.breakdown?.aggregate_risk"
+              :class="['agg-risk', `agg-risk--${riskResult.breakdown.aggregate_risk.risk_level}`]"
+            >
+              <div class="agg-risk__head">
+                <AppIcon name="bar" :size="16" />
+                <span class="agg-risk__title">Сумарний бюджет vs ринок</span>
+                <AppBadge :variant="riskBadgeVariant(riskResult.breakdown.aggregate_risk.risk_level)">
+                  {{ riskLevelLabel(riskResult.breakdown.aggregate_risk.risk_level) }}
+                </AppBadge>
+              </div>
+              <div class="agg-risk__metrics">
+                <div class="agg-risk__metric">
+                  <span class="agg-risk__label">Тендерний бюджет</span>
+                  <span class="agg-risk__value num">
+                    {{ formatPrice(riskResult.breakdown.aggregate_risk.tender_total) }} ₴
+                  </span>
+                </div>
+                <div class="agg-risk__metric">
+                  <span class="agg-risk__label">Сумарна ринкова оцінка</span>
+                  <span class="agg-risk__value num">
+                    {{ formatPrice(riskResult.breakdown.aggregate_risk.market_total) }} ₴
+                  </span>
+                </div>
+                <div class="agg-risk__metric">
+                  <span class="agg-risk__label">Відхилення</span>
+                  <span :class="[
+                    'agg-risk__value num',
+                    riskResult.breakdown.aggregate_risk.deviation_pct > 0 ? 'price-higher' : 'price-lower',
+                  ]">
+                    {{ riskResult.breakdown.aggregate_risk.deviation_pct >= 0 ? '+' : '' }}{{ riskResult.breakdown.aggregate_risk.deviation_pct }}%
+                  </span>
+                </div>
+              </div>
+              <p class="agg-risk__reason">
+                {{ riskResult.breakdown.aggregate_risk.reason }}
+                <span class="agg-risk__coverage num">
+                  Покриття:
+                  {{ riskResult.breakdown.aggregate_risk.items_with_estimate }}/{{ riskResult.breakdown.aggregate_risk.items_total }}
+                  позицій
+                  ({{ riskResult.breakdown.aggregate_risk.coverage_pct }}%)
+                </span>
+              </p>
+            </div>
+
             <ul class="risk-list">
               <li
                 v-for="(pd, idx) in (riskResult.breakdown?.price_deviations || [])"
@@ -318,8 +364,20 @@ import PriceTrendChart from '@/components/tenders/PriceTrendChart.vue'
 
 const STATUS_LABELS = { active: 'Активний', closed: 'Завершений', cancelled: 'Скасований' }
 const STATUS_VARIANTS = { active: 'brand', closed: 'slate', cancelled: 'danger' }
-const RISK_LABELS = { high: 'Високий ризик', medium: 'Середній ризик', low: 'Низький ризик' }
-const RISK_BADGE = { high: 'danger', medium: 'warn', low: 'info' }
+const RISK_LABELS = {
+  high: 'Високий ризик',
+  medium: 'Середній ризик',
+  low: 'Низький ризик',
+  excluded: 'Виключено',
+  unknown: 'Немає даних',
+}
+const RISK_BADGE = {
+  high: 'danger',
+  medium: 'warn',
+  low: 'info',
+  excluded: 'slate',
+  unknown: 'slate',
+}
 
 export default {
   name: 'TenderDetailView',
@@ -853,6 +911,87 @@ export default {
 .risk-item__icon.risk-high { color: var(--color-danger); background: var(--color-red-50); border-color: var(--color-red-100); }
 .risk-item__icon.risk-medium { color: var(--color-warning); background: var(--color-warning-bg); border-color: var(--color-warning-border); }
 .risk-item__icon.risk-low { color: var(--color-info); background: var(--color-info-bg); border-color: var(--color-info-border); }
+.risk-item__icon.risk-excluded,
+.risk-item__icon.risk-unknown {
+  color: var(--color-text-secondary);
+  background: var(--color-bg-subtle);
+  border-color: var(--color-border);
+}
+
+/* Aggregate budget-vs-market block */
+.agg-risk {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.agg-risk--high { border-color: var(--color-red-100); background: var(--color-red-50); }
+.agg-risk--medium { border-color: var(--color-warning-border); background: var(--color-warning-bg); }
+.agg-risk--low { border-color: var(--color-green-100); background: var(--color-green-50); }
+
+[data-theme="dark"] .agg-risk--high { background: rgba(220, 38, 38, 0.10); }
+[data-theme="dark"] .agg-risk--medium { background: rgba(217, 119, 6, 0.10); }
+[data-theme="dark"] .agg-risk--low { background: rgba(16, 185, 129, 0.10); }
+
+.agg-risk__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-heading);
+}
+
+.agg-risk__title {
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
+  flex: 1;
+}
+
+.agg-risk__metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-3);
+}
+
+.agg-risk__metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.agg-risk__label {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--color-text-secondary);
+}
+
+.agg-risk__value {
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
+  color: var(--color-heading);
+}
+
+.agg-risk__reason {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.55;
+}
+
+.agg-risk__coverage {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
 
 .risk-item__body { flex: 1; min-width: 0; }
 

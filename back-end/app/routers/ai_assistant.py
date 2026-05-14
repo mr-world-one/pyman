@@ -156,6 +156,7 @@ async def analyze_risks(
     from app.routers.authorization import get_current_user
     from app.services.risk_analyzer import (
         calculate_price_deviation,
+        calculate_aggregate_risk,
         analyze_discriminatory_requirements,
         calculate_overall_risk_score,
     )
@@ -177,6 +178,7 @@ async def analyze_risks(
             "quantity": item.quantity,
             "unit_name": item.unit_name,
             "unit_price": item.unit_price,
+            "price_source": item.price_source,
         }
         for item in tender.items
     ]
@@ -193,6 +195,10 @@ async def analyze_risks(
         logger.error(f"Price comparison failed for tender #{tender_id}: {e}")
         price_risks = []
         matched_items = []
+
+    # 1b. Aggregate budget vs market — useful when per-item prices are missing
+    tender_total = tender.total_amount or tender.expected_cost
+    aggregate_risk = calculate_aggregate_risk(matched_items, tender_total)
 
     # 2. Discriminatory requirements analysis
     discrim_analysis = None
@@ -219,7 +225,7 @@ async def analyze_risks(
             logger.warning(f"Discriminatory analysis failed for tender #{tender_id}: {e}")
 
     # 3. Overall risk score
-    risk_result = calculate_overall_risk_score(price_risks, discrim_analysis)
+    risk_result = calculate_overall_risk_score(price_risks, discrim_analysis, aggregate_risk)
 
     return AssistantResponse(
         status="success",

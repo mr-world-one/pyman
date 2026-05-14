@@ -125,20 +125,29 @@ export default {
           const dates = (item.history || []).map(e => new Date(e.date))
           const minDate = dates.length ? new Date(Math.min(...dates)) : new Date()
           const maxDate = dates.length ? new Date(Math.max(...dates)) : new Date()
+          // Distinct, theme-agnostic warning color — must read on both light and dark
           datasets.push({
             label: 'Тендерна ціна',
             data: [
               { x: minDate, y: item.tender_price },
               { x: maxDate, y: item.tender_price },
             ],
-            borderColor: '#0f172a',
-            borderDash: [6, 4],
-            borderWidth: 1.5,
+            borderColor: '#dc2626',
+            backgroundColor: 'rgba(220, 38, 38, 0.06)',
+            borderDash: [8, 4],
+            borderWidth: 2,
             fill: false,
             pointRadius: 0,
             pointHoverRadius: 0,
+            order: -1,  // draw on top of other lines
           })
         }
+
+        // Theme-aware axis colors
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
+        const axisColor = isDark ? '#94a3b8' : '#64748b'
+        const gridColor = isDark ? 'rgba(148,163,184,0.12)' : 'rgba(15,23,42,0.06)'
+        const titleColor = isDark ? '#f1f5f9' : '#0f172a'
 
         chartInstances.value[item.item_id] = new Chart(canvas, {
           type: 'line',
@@ -150,11 +159,15 @@ export default {
               x: {
                 type: 'time',
                 time: { unit: 'day', displayFormats: { day: 'dd.MM' } },
-                title: { display: true, text: 'Дата' },
+                title: { display: true, text: 'Дата', color: titleColor },
+                ticks: { color: axisColor },
+                grid: { color: gridColor },
               },
               y: {
-                title: { display: true, text: 'Ціна (грн)' },
+                title: { display: true, text: 'Ціна (грн)', color: titleColor },
                 beginAtZero: false,
+                ticks: { color: axisColor },
+                grid: { color: gridColor },
               },
             },
             plugins: {
@@ -163,7 +176,10 @@ export default {
                   afterLabel: (ctx) => ctx.raw?.title || '',
                 },
               },
-              legend: { position: 'bottom' },
+              legend: {
+                position: 'bottom',
+                labels: { color: titleColor, usePointStyle: true, boxWidth: 12 },
+              },
             },
           },
         })

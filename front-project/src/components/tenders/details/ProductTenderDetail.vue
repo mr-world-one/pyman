@@ -21,8 +21,15 @@
             <td class="name-cell">{{ item.name }}</td>
             <td class="num col-num">{{ item.quantity }}</td>
             <td class="col-short">{{ item.unit_name }}</td>
-            <td class="num col-num">{{ formatPrice(item.unit_price) }}</td>
-            <td class="num col-num emph">{{ formatPrice(item.unit_price * item.quantity) }}</td>
+            <td class="num col-num">
+              <span v-if="item.unit_price != null">{{ formatPrice(item.unit_price) }}</span>
+              <span v-else class="dim">—</span>
+              <PriceSourceBadge :source="item.price_source" />
+            </td>
+            <td class="num col-num emph">
+              <span v-if="item.unit_price != null">{{ formatPrice(item.unit_price * item.quantity) }}</span>
+              <span v-else class="dim">—</span>
+            </td>
             <td class="col-short mono">{{ item.dk_code || '—' }}</td>
             <td class="col-short mono">{{ item.dstu_gost || '—' }}</td>
           </tr>
@@ -33,8 +40,11 @@
 </template>
 
 <script>
+import PriceSourceBadge from '@/components/tenders/PriceSourceBadge.vue'
+
 export default {
   name: 'ProductTenderDetail',
+  components: { PriceSourceBadge },
   props: { items: { type: Array, required: true } },
   methods: {
     formatPrice(val) {
@@ -92,4 +102,6 @@ export default {
 .name-cell { max-width: 360px; color: var(--color-heading); font-weight: var(--font-medium); }
 
 .emph { color: var(--color-heading); font-weight: var(--font-semibold); }
+
+.dim { color: var(--color-text-tertiary); }
 </style>
